@@ -36,4 +36,4 @@ class PTRData(Dataset):
         return {"image":image * 255.0}#"question":question,"answer":answer,"program":program}
 
     def __len__(self):
-        return 500 #len(self.ptr_data)
+        return len(self.file_names)

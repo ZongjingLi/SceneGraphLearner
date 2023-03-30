@@ -15,7 +15,7 @@ class UnknownArgument(Exception):
 class UnknownConceptError(Exception):
     def __init__(self):super()
 
-class HalProgramExecutor(nn.Module):
+class SceneProgramExecutor(nn.Module):
     NETWORK_REGISTRY = {}
 
     def __init__(self, config):
@@ -77,7 +77,7 @@ class MetaLearner(nn.Module):
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)
         name = MetaLearner.get_name(cls.__name__)
-        HalProgramExecutor.NETWORK_REGISTRY[name] = cls
+        SceneProgramExecutor.NETWORK_REGISTRY[name] = cls
         cls.name = name
 
     @staticmethod

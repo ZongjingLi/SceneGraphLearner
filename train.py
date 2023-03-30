@@ -7,6 +7,7 @@ import sys
 from datasets.ptr import *
 
 from config import *
+from models import *
 from visualize.answer_distribution import visualize_image_grid
 
 def train(model, config, args):
@@ -15,6 +16,7 @@ def train(model, config, args):
     
     if args.dataset == "ptr":
         train_dataset = PTRData("train", resolution = config.resolution)
+        train_dataset =  PTRData("val", resolution = config.resolution)
 
     dataloader = DataLoader(train_dataset, batch_size = args.batch_size, shuffle = args.shuffle)
 
@@ -33,7 +35,8 @@ def train(model, config, args):
             itrs += 1
 
             sys.stdout.write ("\rEpoch: {}, Itrs: {} Loss: {}, Time: {}".format(epoch + 1, itrs, working_loss,datetime.timedelta(seconds=time.time() - start)))
-            
+    
+    print("\nExperiment {} : Training Completed.".format(args.name))
 
 
 
@@ -44,11 +47,17 @@ argparser.add_argument("--lr",                  default = 2e-4)
 argparser.add_argument("--batch_size",          default = 4)
 argparser.add_argument("--dataset",             default = "ptr")
 
-argparser.add_argument("--checkpoint_itrs",     default = 100)
+argparser.add_argument("--checkpoint_dir",      default = False)
+argparser.add_argument("--checkpoint_itrs",     default = 1)
 argparser.add_argument("--shuffle",             default = True)
 
 args = argparser.parse_args(args = [])
 
+if args.checkpoint_dir:
+    model = torch.load(args.checkpoint_dir, map_location = config.device)
+else:
+    print("No checkpoint to load and creating a new model instance")
+    model = SceneLearner(config)
 
-train(0, config, args)
+train(model, config, args)
 
