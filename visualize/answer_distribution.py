@@ -8,7 +8,8 @@ def visualize_image_grid(images, row, save_name = "image_grid"):
     plt.tick_params(left = False, right = False , labelleft = False ,
                 labelbottom = False, bottom = False)
     comps_grid = torchvision.utils.make_grid(images,normalize=True,nrow=row)
-    plt.imshow(comps_grid.permute(1,2,0).cpu().detach().numpy())
+
+    plt.imshow(comps_grid.cpu().detach().numpy())
     plt.savefig("outputs/{}.png".format(save_name))
 
 def visualize_outputs(image, outputs):
