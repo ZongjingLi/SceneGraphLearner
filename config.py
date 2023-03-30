@@ -5,7 +5,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument("--name",               default = "SceneGraphLearner")
 
 # setup the perception module
-parser.add_argument("--resolution",         default = (128,128))
+parser.add_argument("--resolution",         default = (256,256))
 parser.add_argument("--hidden_dim",         default = 100)
 
 # setup the concept learner 

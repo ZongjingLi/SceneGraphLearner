@@ -10,7 +10,7 @@ def visualize_image_grid(images, row, save_name = "image_grid"):
     comps_grid = torchvision.utils.make_grid(images,normalize=True,nrow=row)
 
     plt.imshow(comps_grid.cpu().detach().numpy())
-    plt.savefig("outputs/{}.png".format(save_name))
+    plt.savefig("outputs/{}.png".format(save_name), bbox_inches='tight', pad_inches=0)
 
 def visualize_outputs(image, outputs):
 
