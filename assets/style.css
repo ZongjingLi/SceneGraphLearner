@@ -5,9 +5,14 @@
     justify-content: center;
 }
 
+.scene-grid {
+    display: grid;
+    grid-template-columns: 4fr 1fr ;
+}
+
 .language-grid {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: 2fr ;
 }
 
 header {
@@ -19,25 +24,63 @@ footer {
     grid-area: "footer";
 }
 
+.sgroup .image-container {
+    
+    background-color: #ffffff;
+    border-width: 1px;
+    border-style: solid;
+    border-radius: 10px;
+    padding: 20px;
+    border-color: #eaeaea;
+    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.05);
+    position: relative;
+}
+
+.image-container img{
+}
+
+
 .pgroup {
     grid-area: "pgroup";
+    margin-left: auto;
+    margin-right: auto;
+    max-width: 1200px;
+    padding: 30px;
+}
+
+.sgroup {
+    grid-area: "sgroup";
+    margin-left: auto;
+    margin-right: auto;
+    max-width: 1200px;
+    padding: 30px;
+    align-items: center;
 }
 
 .lgroup {
     grid-area: "lgroup";
+    margin-left: auto;
+    margin-right: auto;
+    max-width: 1200px;
+    padding: 30px;
 }
 
 body {
     grid-template-areas:
         "header header header"
         "pgroup pgroup pgroup"
+        "sgroup sgroup sgroup"
         "lgroup lgroup lgroup"
         "footer footer footer";
-    background: #F8F8F8;
     margin: 0;
-    font-family: helvetica, sans-serif;
+    background-color: #f7f7f7;
+    color: #4a4a4a;
+    font-family: 'open-sans', sans-serif;
+    font-size: 16px;
+    line-height: 1.2;
 
 }
+
 
 h1 {
     font-size: 35px;
@@ -46,6 +89,7 @@ h1 {
 h1>span {color: #266b77;}
 
 h3 {padding-bottom: 5px; border-bottom: 1px dotted #999; color: #266b77;margin-left: 30px;}
+
 
 p {
     margin: 20px 0px;
@@ -81,3 +125,13 @@ input {
 }
 .btn-create:hover { background-color: #e3e3e3; border-color: rgba(0,0,0,0.5); }
 .btn-create:active { background-color: #CCC; border-color: rgba(0,0,0,0.9); }
+
+
+footer {
+    margin: 0;
+    color: #4a4a4a;
+    font-family: 'open-sans', sans-serif;
+    font-size: 16px;
+    line-height: 1.2;
+    margin-left: 10%;
+}

@@ -9,28 +9,45 @@
     <link rel="stylesheet" href="assets/treeData.min.css">
 </head>
 <body>
-    <div class="layout">
-        <header>
-            <h1>Hierarchial Scene Graph Learner</h1>
-        </header>
 
-        <div class="pgroup">
-            <h3>Percepiton Module</h3>
-            <div class = "grid">
-                <img src="outputs/val_image.png", width = "256", height = "256">
-                <img src="outputs/val_image.png", width = "256", height = "256">
-                <img src="outputs/val_image.png", width = "256", height = "256">
+        <div class="layout">
+            <header>
+                <h1>Hierarchial Scene Graph Learner</h1>
+            </header>
+
+            <div class="pgroup">
+                <h3>Percepiton Module</h3>
+                <div class = "grid">
+                    <img src="outputs/val_image.png", width = "256", height = "256">
+                    <img src="outputs/val_image.png", width = "256", height = "256">
+                    <img src="outputs/val_image.png", width = "256", height = "256">
+                </div>
             </div>
-        </div>
 
-        <div class="lgroup">
-            <h3>Joint Language Module</h3>
-                <div id="language" class = "language-grid">
-                <div id="tree"></div>
-                <div id="graph"></div>  
-        </div>
 
-        <footer>This is the footer</footer>
+        
+            <div class="sgroup">
+                <h3>Parsed Scene Graph</h3>
+                    <div id="language" class = "scene-grid">
+                        <div id="graph"></div>  
+                        <div class="image-container">
+                            <img src="outputs/val_image.png", width = "256", height = "256">
+                            <hr>
+                            some contents to write here in case of other usages.
+                        </div>
+                        
+                    </div>
+            </div>
+
+            <div class="lgroup">
+                <h3>Joint Language Module</h3>
+                <div class="image-container">
+                    <img src="outputs/val_image.png", width = "256", height = "256">
+                </div>
+            </div>
+        
+
+        <footer>Created By Zongjing Li 2022</footer>
     
     </div>
 
@@ -56,7 +73,7 @@ var tree = {
 
 };
 
-TreeData(tree, "#tree");
+//*TreeData(tree, "#tree");
 TreeData(tree, "#graph")
 </script>
 </body>
