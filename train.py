@@ -14,24 +14,53 @@ def train(model, config, args):
     print("\nstart the experiment: {}".format(args.name))
     print("experiment config: \nepoch: {} \nbatch: {} samples \nlr: {}\n".format(args.epoch,args.batch_size,args.lr))
     
+    #[setup the training and validation dataset]
     if args.dataset == "ptr":
         train_dataset = PTRData("train", resolution = config.resolution)
-        train_dataset =  PTRData("val", resolution = config.resolution)
+        val_dataset =  PTRData("val", resolution = config.resolution)
 
     dataloader = DataLoader(train_dataset, batch_size = args.batch_size, shuffle = args.shuffle)
 
+    # [joint training of perception and language]
+    alpha = args.alpha
+    beta  = args.beta
+    
+    query = True if args.training_mode in ["joint", "query"] else False
+
+    # [setup the optimizer and lr schedulr]
+    if args.optimizer == "Adam":
+        optimizer = torch.optim.Adam(model.parameters(), lr = args.lr)
+    if args.optimizer == "RMSprop":
+        optimizer = torch.optim.RMSprop(model.parameters(), lr = args.lr)
+
+    # [start the training process recording]
     itrs = 0
     start = time.time()
 
     for epoch in range(args.epoch):
         for sample in dataloader:
             
+            # [perception module training]
             ims = sample["image"]
 
-            working_loss = 0
+            perception_loss = 0
+
+            # [language query module training]
+            language_loss = 0
+            if query:
+                language_loss += 0
+
+            # [calculate the working loss]
+            working_loss = perception_loss * alpha + language_loss * beta
+
+            # [backprop and optimize parameters]
+            optimizer.zero_grad()
+            working_loss.backward()
+            optimizer.step()
 
             if not(itrs % args.checkpoint_itrs):
                 visualize_image_grid(ims.flatten(start_dim = 0, end_dim = 1).cpu().detach(), row = args.batch_size, save_name = "ptr_gt_perception")
+                visualize_image_grid(ims[0].cpu().detach(), row = 1, save_name = "val_gt_image")
             itrs += 1
 
             sys.stdout.write ("\rEpoch: {}, Itrs: {} Loss: {}, Time: {}".format(epoch + 1, itrs, working_loss,datetime.timedelta(seconds=time.time() - start)))
@@ -48,6 +77,11 @@ argparser.add_argument("--optimizer",               default = "Adam")
 argparser.add_argument("--lr",                      default = 2e-4)
 argparser.add_argument("--batch_size",              default = 4)
 argparser.add_argument("--dataset",                 default = "ptr")
+
+# [perception and language grounding training]
+argparser.add_argument("--training_mode",           default = "perception")
+argparser.add_argument("--alpha",                   default = 1.0)
+argparser.add_argument("--beta",                    default = 1.0)
 
 # [additional training details]
 argparser.add_argument("--warmup",                  default = False)

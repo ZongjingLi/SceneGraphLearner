@@ -5,16 +5,36 @@
     <title>TreeData.js</title>
     <!--Optional-->
     <link rel="stylesheet" href="assets/style.css">
-
     <!--Required-->
     <link rel="stylesheet" href="assets/treeData.min.css">
 </head>
 <body>
-<div id="container">
-  <div id="tree"></div>
-</div>
+    <div class="layout">
+        <header>
+            <h1>Hierarchial Scene Graph Learner</h1>
+        </header>
 
-<script type="text/javascript" src="js/treeData.js"></script>
+        <div class="pgroup">
+            <h3>Percepiton Module</h3>
+            <div class = "grid">
+                <img src="outputs/val_image.png", width = "256", height = "256">
+                <img src="outputs/val_image.png", width = "256", height = "256">
+                <img src="outputs/val_image.png", width = "256", height = "256">
+            </div>
+        </div>
+
+        <div class="lgroup">
+            <h3>Joint Language Module</h3>
+                <div id="language" class = "language-grid">
+                <div id="tree"></div>
+                <div id="graph"></div>  
+        </div>
+
+        <footer>This is the footer</footer>
+    
+    </div>
+
+<script type="text/javascript" src="assets/treeData.js"></script>
 <script>
 var tree = {
      zelda : {value : "Zelda Timeline", parent : ""},
@@ -37,6 +57,7 @@ var tree = {
 };
 
 TreeData(tree, "#tree");
+TreeData(tree, "#graph")
 </script>
 </body>
 </html>

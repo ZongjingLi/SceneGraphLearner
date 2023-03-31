@@ -1,43 +1,51 @@
 .grid {
     display: grid;
     grid-template-columns: 1fr 1fr 1fr;
-    column-gap: 24px;
-    row-gap: 24px;
-    align-content: center;
+
+    justify-content: center;
 }
 
-html, body {
+.language-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+}
+
+header {
+    grid-area: "header";
+    text-align: center;
+}
+
+footer {
+    grid-area: "footer";
+}
+
+.pgroup {
+    grid-area: "pgroup";
+}
+
+.lgroup {
+    grid-area: "lgroup";
+}
+
+body {
+    grid-template-areas:
+        "header header header"
+        "pgroup pgroup pgroup"
+        "lgroup lgroup lgroup"
+        "footer footer footer";
     background: #F8F8F8;
-    margin:0;
+    margin: 0;
     font-family: helvetica, sans-serif;
-}
 
-main:after,
-nav:after,
-footer:after,
-header:after,
-section:after,
-form:after,
-div:after,
-ul:after,
-ol:after,
-dl:after {
-  content: ".";
-  display: block;
-  clear: both;
-  visibility: hidden;
-  height: 0;
-  overflow: hidden;
 }
-hr {padding: 5px; border: none;}
 
 h1 {
-    font-size: 25px;
+    font-size: 35px;
     margin: 20px 20px 55px 0px;
 }
 h1>span {color: #266b77;}
 
-h3 {padding-bottom: 5px; border-bottom: 1px dotted #999; color: #266b77;}
+h3 {padding-bottom: 5px; border-bottom: 1px dotted #999; color: #266b77;margin-left: 30px;}
 
 p {
     margin: 20px 0px;
@@ -54,26 +62,6 @@ input {
     margin-left: 310px;
 }
 
-#main, #container {
-    position: relative;
-    margin: 0 auto;
-    width: 820px;
-    margin-top: 50px;
-}
-
-#info {
-    width: 820px;
-}
-
-.gitHub {
-    position: absolute;
-    right: 0;
-    top: 0;
-}
-
-.logo {
-    padding-right: 14px;
-}
 
 .btn-create {
     display: inline-block;
