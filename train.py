@@ -41,15 +41,25 @@ def train(model, config, args):
 
 
 argparser = argparse.ArgumentParser()
-argparser.add_argument("--name",                default = "KFT")
-argparser.add_argument("--epoch",               default = 3000)
-argparser.add_argument("--lr",                  default = 2e-4)
-argparser.add_argument("--batch_size",          default = 4)
-argparser.add_argument("--dataset",             default = "ptr")
+# [general config of the training]
+argparser.add_argument("--name",                    default = "KFT")
+argparser.add_argument("--epoch",                   default = 1)
+argparser.add_argument("--optimizer",               default = "Adam")
+argparser.add_argument("--lr",                      default = 2e-4)
+argparser.add_argument("--batch_size",              default = 4)
+argparser.add_argument("--dataset",                 default = "ptr")
 
-argparser.add_argument("--checkpoint_dir",      default = False)
-argparser.add_argument("--checkpoint_itrs",     default = 1)
-argparser.add_argument("--shuffle",             default = True)
+# [additional training details]
+argparser.add_argument("--warmup",                  default = False)
+argparser.add_argument("--warmup_steps",            default = 1000)
+argparser.add_argument("--decay",                   default = False)
+argparser.add_argument("--decay_steps",             default = 20000)
+argparser.add_argument("--decay_rate",              default = 0.99)
+argparser.add_argument("--shuffle",                 default = True)
+
+# [checkpoint location and savings]
+argparser.add_argument("--checkpoint_dir",          default = False)
+argparser.add_argument("--checkpoint_itrs",         default = 1)
 
 args = argparser.parse_args(args = [])
 
