@@ -39,6 +39,9 @@ def log_imgs(imsize,pred_img,clusters,gt_img,writer,iter_):
     writer.add_image("Output_vs_GT",grid.detach().numpy(),iter_)
     writer.add_image("Output_vs_GT Var",grid.detach().numpy(),iter_)
 
+    visualize_image_grid(cluster_imgs[0,...], row = 1, save_name = "val_cluster")
+    visualize_image_grid(pred_img.reshape(batch_size,imsize,imsize,3)[0,...], row = 1, save_name = "val_recon")
+
 def train(model, config, args):
     print("\nstart the experiment: {}".format(args.name))
     print("experiment config: \nepoch: {} \nbatch: {} samples \nlr: {}\n".format(args.epoch,args.batch_size,args.lr))

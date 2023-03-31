@@ -117,7 +117,6 @@ class PSGNet(torch.nn.Module):
         self.affinity_aggregations = torch.nn.ModuleList([
             P1AffinityAggregation(),
             P2AffinityAggregation(node_feat_size),
-            P2AffinityAggregation(node_feat_size),
 
         ])
 
@@ -234,6 +233,14 @@ class PSGNet(torch.nn.Module):
             recons.append(paint_by_numbers)
             
         return {"recons":recons,"clusters":clusters,"losses":all_losses,"features":intermediates}
+
+class AbstractNet(nn.Module):
+    def __init__(self,config):
+        super().__init__()
+        self.decoder = None
+    
+    def forward(self, x, row, col):
+        return 0
 
 class SceneTreeNet(nn.Module):
     def __init__(self, config):

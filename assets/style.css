@@ -57,6 +57,10 @@ footer {
     align-items: center;
 }
 
+.sgroup .head{
+    text-align: center;
+}
+
 .lgroup {
     grid-area: "lgroup";
     margin-left: auto;
