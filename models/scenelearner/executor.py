@@ -15,6 +15,13 @@ class UnknownArgument(Exception):
 class UnknownConceptError(Exception):
     def __init__(self):super()
 
+class SceneGraphRepresentation(nn.Module):
+    def __init__(self):
+        super().__init__()
+
+        self.effective_level = 1
+        self.max_level = 4
+
 class SceneProgramExecutor(nn.Module):
     NETWORK_REGISTRY = {}
 
