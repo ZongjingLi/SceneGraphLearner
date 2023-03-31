@@ -22,6 +22,10 @@ class SceneGraphRepresentation(nn.Module):
         self.effective_level = 1
         self.max_level = 4
 
+    @property
+    def top_objects(self):
+        return 0
+
 class SceneProgramExecutor(nn.Module):
     NETWORK_REGISTRY = {}
 
