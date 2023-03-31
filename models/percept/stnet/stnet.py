@@ -67,21 +67,7 @@ def QSR(grid,px,py,pa,pr):
              (mx * (torch.cos(pr)) + my * (torch.sin(pr)) - py)
     )
 
-class Level:
-    def __init__(self,centroids,features,edges,clusters,batch,spe):
-        # input level centroids, edges connected and the batch info
-        self.centroids = centroids
-        
-        self.features = features
-        self.edges = edges
-        self.clusters = clusters
-        self.batch = batch
-        self.spatial_coords = spe
 
-        self.centx = scatter_mean(self.spatial_coords[:,0],clusters,dim = -1).unsqueeze(0)
-        self.centy = scatter_mean(self.spatial_coords[:,1],clusters,dim = -1).unsqueeze(0)
-        self.centroids = torch.cat([self.centx,self.centy],0).permute([1,0])#.unsqueeze()
-    
 
 def render_level(level,name = "Namo",scale = 64):
 
@@ -197,7 +183,6 @@ class PSGNet(torch.nn.Module):
 
         clusters, all_losses = [], [] # clusters just used for visualizations
         intermediates = [] # intermediate values
-        levels = []
 
         ## Perform Affinity Calculation and Graph Clustering
 
@@ -227,7 +212,6 @@ class PSGNet(torch.nn.Module):
 
             all_losses.append(losses)
             intermediates.append(x)
-            levels.append(Level(centroids = centroids,features =x, edges = edge_index,clusters = cluster_r, batch = batch,spe = self.spatial_coords))
 
         joint_spatial_features = []
 
@@ -249,5 +233,14 @@ class PSGNet(torch.nn.Module):
                     ,graph_in.batch)[0]
             recons.append(paint_by_numbers)
             
-        return {"recons":recons,"clusters":clusters,"losses":all_losses,"features":intermediates,"levels":levels}
-       
+        return {"recons":recons,"clusters":clusters,"losses":all_losses,"features":intermediates}
+
+class SceneTreeNet(nn.Module):
+    def __init__(self, config):
+        super().__init__()
+        self.backbone = PSGNet(config)
+
+    def forward(self, ims):
+        primary_scene = self.backbone(ims)
+        abstract_scene = primary_scene
+        return abstract_scene
