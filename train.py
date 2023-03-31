@@ -36,7 +36,7 @@ def train(model, config, args):
 
             sys.stdout.write ("\rEpoch: {}, Itrs: {} Loss: {}, Time: {}".format(epoch + 1, itrs, working_loss,datetime.timedelta(seconds=time.time() - start)))
     
-    print("\nExperiment {} : Training Completed.".format(args.name))
+    print("\n\nExperiment {} : Training Completed.".format(args.name))
 
 
 
