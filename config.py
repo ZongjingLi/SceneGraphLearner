@@ -7,11 +7,15 @@ translator = {"scene":Scene,"exist":Exist,"filter":Filter,"union":Union,"unique"
 device = "cuda:0" if torch.cuda.is_available() else "cpu"
 
 parser = argparse.ArgumentParser()
+parser.add_argument("--device",             default = device)
 parser.add_argument("--name",               default = "SceneGraphLearner")
 parser.add_argument("--domain",             default = "toy")
 
 # setup the perception module
-parser.add_argument("--resolution",         default = (256,256))
+parser.add_argument("--perception",         default = "psgnet")
+parser.add_argument("--perception_size",    default = 2)
+parser.add_argument("--imsize",             default = 128)
+parser.add_argument("--resolution",         default = (128,128))
 parser.add_argument("--hidden_dim",         default = 100)
 
 # setup the concept learner 

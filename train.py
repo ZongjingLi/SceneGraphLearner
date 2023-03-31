@@ -8,7 +8,36 @@ from datasets.ptr import *
 
 from config import *
 from models import *
-from visualize.answer_distribution import visualize_image_grid
+from visualize.answer_distribution import visualize_image_grid,lin2img
+
+from torch.utils.tensorboard import SummaryWriter
+import torchvision
+from skimage import color
+
+
+def log_imgs(imsize,pred_img,clusters,gt_img,writer,iter_):
+
+    batch_size = pred_img.shape[0]
+    
+    # Write grid of output vs gt 
+    grid = torchvision.utils.make_grid(
+                          lin2img(torch.cat((pred_img.cpu(),gt_img.cpu()))),
+                          normalize=True,nrow=batch_size)
+
+    # Write grid of image clusters through layers
+    cluster_imgs = []
+    for i,(cluster,_) in enumerate(clusters):
+        for cluster_j,_ in reversed(clusters[:i+1]): cluster = cluster[cluster_j]
+        pix_2_cluster = to_dense_batch(cluster,clusters[0][1])[0]
+        cluster_2_rgb = torch.tensor(color.label2rgb(
+                    pix_2_cluster.detach().cpu().numpy().reshape(-1,imsize,imsize) 
+                                    ))
+        cluster_imgs.append(cluster_2_rgb)
+    cluster_imgs = torch.cat(cluster_imgs)
+    grid2=torchvision.utils.make_grid(cluster_imgs.permute(0,3,1,2),nrow=batch_size)
+    writer.add_image("Clusters",grid2.detach().numpy(),iter_)
+    writer.add_image("Output_vs_GT",grid.detach().numpy(),iter_)
+    writer.add_image("Output_vs_GT Var",grid.detach().numpy(),iter_)
 
 def train(model, config, args):
     print("\nstart the experiment: {}".format(args.name))
@@ -36,14 +65,28 @@ def train(model, config, args):
     # [start the training process recording]
     itrs = 0
     start = time.time()
+    logging_root = "./logs"
+    ckpt_dir     = os.path.join(logging_root, 'checkpoints')
+    events_dir   = os.path.join(logging_root, 'events')
+    if not os.path.exists(ckpt_dir): os.makedirs(ckpt_dir)
+    if not os.path.exists(events_dir): os.makedirs(events_dir)
+    writer = SummaryWriter(events_dir)
 
     for epoch in range(args.epoch):
         for sample in dataloader:
             
             # [perception module training]
-            ims = sample["image"]
+            gt_ims = torch.tensor(sample["image"].numpy()).float().to(config.device)
+
+            outputs = model.scene_perception(gt_ims)
+            recons, clusters, all_losses = outputs["recons"],outputs["clusters"],outputs["losses"]
+
 
             perception_loss = 0
+
+            for i,pred_img in enumerate(recons[:]):
+                perception_loss += torch.nn.functional.l1_loss(pred_img.flatten(), gt_ims.flatten())
+            
 
             # [language query module training]
             language_loss = 0
@@ -58,9 +101,19 @@ def train(model, config, args):
             working_loss.backward()
             optimizer.step()
 
+            for i,losses in enumerate(all_losses):
+                for loss_name,loss in losses.items():
+                    writer.add_scalar(str(i)+loss_name, loss, itrs)
+            writer.add_scalar("working_loss", working_loss, itrs)
+            writer.add_scalar("perception_loss", perception_loss, itrs)
+            writer.add_scalar("language_loss", language_loss, itrs)
+
             if not(itrs % args.checkpoint_itrs):
-                visualize_image_grid(ims.flatten(start_dim = 0, end_dim = 1).cpu().detach(), row = args.batch_size, save_name = "ptr_gt_perception")
-                visualize_image_grid(ims[0].cpu().detach(), row = 1, save_name = "val_gt_image")
+                log_imgs(config.imsize,pred_img.cpu().detach(), clusters, gt_ims.reshape([args.batch_size,config.imsize ** 2,3]).cpu().detach(),writer,itrs)
+                
+                visualize_image_grid(gt_ims.flatten(start_dim = 0, end_dim = 1).cpu().detach(), row = args.batch_size, save_name = "ptr_gt_perception")
+                visualize_image_grid(gt_ims[0].cpu().detach(), row = 1, save_name = "val_gt_image")
+
             itrs += 1
 
             sys.stdout.write ("\rEpoch: {}, Itrs: {} Loss: {}, Time: {}".format(epoch + 1, itrs, working_loss,datetime.timedelta(seconds=time.time() - start)))
@@ -93,7 +146,8 @@ argparser.add_argument("--shuffle",                 default = True)
 
 # [checkpoint location and savings]
 argparser.add_argument("--checkpoint_dir",          default = False)
-argparser.add_argument("--checkpoint_itrs",         default = 1)
+argparser.add_argument("--checkpoint_itrs",         default = 10)
+argparser.add_argument("--pretrain_perception",     default = False)
 
 args = argparser.parse_args(args = [])
 
@@ -102,6 +156,9 @@ if args.checkpoint_dir:
 else:
     print("No checkpoint to load and creating a new model instance")
     model = SceneLearner(config)
+
+if args.pretrain_perception:
+    model.scene_perception = torch.load(args.pretrain_perception, map_location = config.device)
 
 train(model, config, args)
 

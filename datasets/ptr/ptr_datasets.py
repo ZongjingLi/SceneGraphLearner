@@ -33,7 +33,7 @@ class PTRData(Dataset):
         image = image.convert("RGB").resize(self.resolution) 
         image = self.img_transform(image).permute([1,2,0]) 
         #return torch.tensor(np.array(image)).float()/256
-        return {"image":image * 255.0}#"question":question,"answer":answer,"program":program}
+        return {"image":image * 1.0}#"question":question,"answer":answer,"program":program}
 
     def __len__(self):
         return len(self.file_names)

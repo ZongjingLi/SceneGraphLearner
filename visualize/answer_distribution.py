@@ -1,6 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
+import torch
 import torchvision
 
 def visualize_image_grid(images, row, save_name = "image_grid"):
@@ -93,3 +94,11 @@ def visualize_scores(scores):
 
     plt.savefig("outputs/scores.png")
 
+
+# From SRN utils, just formats a flattened image for image writing
+def lin2img(tensor):
+    batch_size, num_samples, channels = tensor.shape
+    sidelen = np.sqrt(num_samples).astype(int)
+    return tensor.permute(0,2,1).view(batch_size, channels, sidelen, sidelen)
+
+# Takes the pred img and clusters produced and writes them to a TF writer

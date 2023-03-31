@@ -88,7 +88,7 @@ def optical_flow_motion_mask(video):
     return masks
 
 class PSGNet(torch.nn.Module):
-    def __init__(self,imsize):
+    def __init__(self,imsize, perception_size):
 
         super().__init__()
         device = "cuda:0" if torch.cuda.is_available() else "cpu"
@@ -105,7 +105,7 @@ class PSGNet(torch.nn.Module):
         # [Global Coords]
         self.global_coords = self.spatial_coords.float()
 
-        self.spatial_edges = build_perception(imsize,2,device = device)
+        self.spatial_edges = build_perception(imsize,perception_size,device = device)
         self.spatial_coords = self.spatial_coords.to(device).float() / imsize
         # Conv. feature extractor to map pixels to feature vectors
         self.rdn = RDN(SimpleNamespace(G0=node_feat_size  ,RDNkSize=3,n_colors=3,
@@ -238,7 +238,7 @@ class PSGNet(torch.nn.Module):
 class SceneTreeNet(nn.Module):
     def __init__(self, config):
         super().__init__()
-        self.backbone = PSGNet(config)
+        self.backbone = PSGNet(imsize = config.imsize, perception_size = config.perception_size)
 
     def forward(self, ims):
         primary_scene = self.backbone(ims)
