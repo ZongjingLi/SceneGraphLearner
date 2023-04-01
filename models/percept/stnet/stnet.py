@@ -15,6 +15,7 @@ from .affinities            import *
 from .primary               import * 
 from utils                  import *
 
+import math
 import matplotlib.pyplot as plt
 
 def build_perception(size,length,device):
@@ -239,12 +240,34 @@ class PSGNet(torch.nn.Module):
 class AbstractNet(nn.Module):
     def __init__(self,config):
         super().__init__()
-        self.shape_decoder = nn.Transformer(nhead=16, num_encoder_layers=12,d_model = config.global_feature_dim,batch_first = True)
-        self.pose_decoder = nn.Transformer(nhead=16, num_encoder_layers=12,d_model = config.global_feature_dim,batch_first = True)
-
+        
+        self.num_heads =8
+        self.feature_decoder = nn.Transformer(nhead=16, num_encoder_layers=12,d_model = config.global_feature_dim,batch_first = True)
+        self.spatial_decoder = nn.Transformer(nhead=16, num_encoder_layers=12,d_model = config.global_feature_dim,batch_first = True)
+        self.source_heads = nn.Parameter(torch.randn([self.num_heads,config.global_feature_dim]))
     
-    def forward(self, x, row, col):
-        return 0
+    def forward(self, input_graph):
+        B = 4; M  =  20; N  = self.num_heads, C = 64
+        # [Feature Propagation]
+        component_features = None
+        component_spaitals = None
+
+        # [Decode Proposals]
+        global_feature = 0
+        feature_proposals = self.feature_decoder(global_feature)
+        spaital_proposals = self.spatial_decoder(global_feature)
+
+        # [Component Matching]
+        # component_features : [B,M,C]
+        # feature_proposals  : [B,N,C]
+
+        match = torch.softmax(torch.einsum("bnc,bmc -> bnm",component_features, proposal_features)/math.sqrt(C), dim = -1)
+        existence = torch.max(match, dim = 1).values  # [B, N, 1]
+
+        # [Construct Representation]
+        output_graph = 0
+
+        return output_graph
 
 class SceneTreeNet(nn.Module):
     def __init__(self, config):
