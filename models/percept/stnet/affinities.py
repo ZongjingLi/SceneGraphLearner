@@ -35,7 +35,7 @@ class AffinityConditionedAggregation(torch.nn.Module, ABC):
         if self.Type == "P1":
             filtered_edge_index = edge_index[:, affinities <= threshold]
         if self.Type == "P2":
-            filtered_edge_index = edge_index[:, affinities >= threshold]
+            filtered_edge_index = edge_index[:, affinities <= threshold]
             
 
         # Coarsen graph with filtered adj. list to produce next level's nodes
@@ -80,7 +80,9 @@ class P2AffinityAggregation(AffinityConditionedAggregation):
         # Affinities as function of vae reconstruction of node pairs
         #_, recon_loss, kl_loss = self.node_pair_vae( torch.abs(x[row]-x[col]) )
         _, recon_loss, kl_loss = self.node_pair_vae( x[row] - x[col] )
-        edge_affinities = 1/(1 + self.v2*recon_loss)
+        #edge_affinities = 1/(1 + self.v2*recon_loss)
+        
+        edge_affinities = self.v2*recon_loss +  torch.linalg.norm(x[row] - x[col],dim = 1) * 0.1
 
         losses = {"recon_loss":recon_loss.mean(), "kl_loss":kl_loss.mean()}
 

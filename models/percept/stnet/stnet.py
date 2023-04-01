@@ -96,7 +96,7 @@ class PSGNet(torch.nn.Module):
         self.device = device
         self.imsize = imsize
 
-        node_feat_size   = 32
+        node_feat_size   = 64
         num_graph_layers = 2
 
         
@@ -116,7 +116,9 @@ class PSGNet(torch.nn.Module):
         # Affinity modules: for now just one of P1 and P2 
         self.affinity_aggregations = torch.nn.ModuleList([
             P1AffinityAggregation(),
-            P2AffinityAggregation(node_feat_size),
+            P1AffinityAggregation(),
+            #P2AffinityAggregation(node_feat_size),
+            #P2AffinityAggregation(node_feat_size),
 
         ])
 
@@ -237,7 +239,9 @@ class PSGNet(torch.nn.Module):
 class AbstractNet(nn.Module):
     def __init__(self,config):
         super().__init__()
-        self.decoder = None
+        self.shape_decoder = nn.Transformer(nhead=16, num_encoder_layers=12,d_model = config.global_feature_dim,batch_first = True)
+        self.pose_decoder = nn.Transformer(nhead=16, num_encoder_layers=12,d_model = config.global_feature_dim,batch_first = True)
+
     
     def forward(self, x, row, col):
         return 0

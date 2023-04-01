@@ -29,4 +29,8 @@ parser.add_argument("--offset",             default = [-.15, .15])
 parser.add_argument("--center",             default =[.1, .2])
 parser.add_argument("--entries",            default = 10)
 parser.add_argument("--translator",         default = translator)
+
+# hiearchy graph generation
+parser.add_argument("--global_feature_dim", default = 64)
+
 config = parser.parse_args(args = [])

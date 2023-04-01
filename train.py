@@ -4,7 +4,7 @@ import datetime
 import time
 import sys
 
-from datasets.ptr import *
+from datasets import *
 
 from config import *
 from models import *
@@ -39,7 +39,7 @@ def log_imgs(imsize,pred_img,clusters,gt_img,writer,iter_):
     writer.add_image("Output_vs_GT",grid.detach().numpy(),iter_)
     writer.add_image("Output_vs_GT Var",grid.detach().numpy(),iter_)
 
-    visualize_image_grid(cluster_imgs[0,...], row = 1, save_name = "val_cluster")
+    visualize_image_grid(cluster_imgs[batch_size,...], row = 1, save_name = "val_cluster")
     visualize_image_grid(pred_img.reshape(batch_size,imsize,imsize,3)[0,...], row = 1, save_name = "val_recon")
 
 def train(model, config, args):
@@ -50,6 +50,8 @@ def train(model, config, args):
     if args.dataset == "ptr":
         train_dataset = PTRData("train", resolution = config.resolution)
         val_dataset =  PTRData("val", resolution = config.resolution)
+    if args.dataset == "toy":
+        train_dataset = ToyData("train", resolution = config.resolution)
 
     dataloader = DataLoader(train_dataset, batch_size = args.batch_size, shuffle = args.shuffle)
 
@@ -128,11 +130,11 @@ def train(model, config, args):
 argparser = argparse.ArgumentParser()
 # [general config of the training]
 argparser.add_argument("--name",                    default = "KFT")
-argparser.add_argument("--epoch",                   default = 1)
+argparser.add_argument("--epoch",                   default = 100)
 argparser.add_argument("--optimizer",               default = "Adam")
 argparser.add_argument("--lr",                      default = 2e-4)
 argparser.add_argument("--batch_size",              default = 4)
-argparser.add_argument("--dataset",                 default = "ptr")
+argparser.add_argument("--dataset",                 default = "toy")
 
 # [perception and language grounding training]
 argparser.add_argument("--training_mode",           default = "perception")
