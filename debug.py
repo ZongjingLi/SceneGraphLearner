@@ -56,11 +56,12 @@ class AbstractNet(nn.Module):
 
         self.coordinate_decoder = nn.Linear(config.global_feature_dim, 2)
     
-    def forward(self, input_graph):
-        B = 4; M  =  20; N  = self.num_heads, C = 64
+    def forward(self, feature, spatial):
+        B, M, C = feature.shape
+        N = self.num_heads
         # [Feature Propagation]
-        component_features = None
-        component_spaitals = None
+        component_features = feature
+        component_spaitals = spatial
 
         # [Decode Proposals]
         global_feature = torch.randn()
