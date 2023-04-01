@@ -1,4 +1,4 @@
-from tkinter import E
+
 from models import *
 from config import *
 

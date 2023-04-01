@@ -187,7 +187,8 @@ class PSGNet(torch.nn.Module):
         intermediates = [] # intermediate values
 
         ## Perform Affinity Calculation and Graph Clustering
-
+        level_centroids = []
+        level_moments = []
         
         for pool, conv, transf in zip(self.affinity_aggregations,
                                       self.graph_convs, self.node_transforms):
@@ -215,6 +216,10 @@ class PSGNet(torch.nn.Module):
             all_losses.append(losses)
             intermediates.append(x)
 
+            level_centroids.append(centroids)
+            level_moments.append(moments)
+            
+
         joint_spatial_features = []
 
         for i,(cluster_r,_) in enumerate(clusters):
@@ -235,7 +240,7 @@ class PSGNet(torch.nn.Module):
                     ,graph_in.batch)[0]
             recons.append(paint_by_numbers)
             
-        return {"recons":recons,"clusters":clusters,"losses":all_losses,"features":intermediates}
+        return {"recons":recons,"clusters":clusters,"losses":all_losses,"features":intermediates, "centroids":level_centroids, "moments":level_moments}
 
 class AbstractNet(nn.Module):
     def __init__(self,config):
