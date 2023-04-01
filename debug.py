@@ -25,7 +25,7 @@ def normalize_outputs(outputs):
 
     clusters = outputs["clusters"]
 
-    for item in clusters:print(clusters)
+    for item in clusters:print(item[0].shape, item[1].shape)
 
     level_reconstructions = [item.reshape([B,W,W,3]) for item in recons]
     level_scene_graphs  = []
