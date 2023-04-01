@@ -189,12 +189,14 @@ class PSGNet(torch.nn.Module):
         ## Perform Affinity Calculation and Graph Clustering
         level_centroids = []
         level_moments = []
+        level_batch = []
         
         for pool, conv, transf in zip(self.affinity_aggregations,
                                       self.graph_convs, self.node_transforms):
             batch_uncoarsened = batch
 
             x, edge_index, batch, cluster, losses = pool(x, edge_index, batch)
+            level_batch.append(batch)
 
             clusters.append( (cluster, batch_uncoarsened) )
             for i,(cluster_r,_) in enumerate(clusters):
@@ -240,22 +242,49 @@ class PSGNet(torch.nn.Module):
                     ,graph_in.batch)[0]
             recons.append(paint_by_numbers)
             
-        return {"recons":recons,"clusters":clusters,"losses":all_losses,"features":intermediates, "centroids":level_centroids, "moments":level_moments}
+        return {"recons":recons,"clusters":clusters,
+        "losses":all_losses,
+        "features":intermediates, 
+        "centroids":level_centroids, 
+        "moments":level_moments,
+        "batch":level_batch}
+
+def to_dense_features(outputs):
+    level_batch = outputs["batch"]
+    features = outputs["features"]
+    centroids = outputs["centroids"]
+    moments = outputs["moments"]
+    level_features = []
+    for i in range(len(features)):
+        cast_batch = level_batch[i]
+
+        feature,  _ = to_dense_batch(features[i],cast_batch)
+        centroid, _ = to_dense_batch(centroids[i],cast_batch)
+        moment,   _ = to_dense_batch(moments[i],cast_batch)
+
+        level_features.append({"features":feature, "centroids":centroid, "moments":moment})
+    return level_features
 
 class AbstractNet(nn.Module):
-    def __init__(self,config):
+    def __init__(self,dim = 72, width = 10):
         super().__init__()
         
-        self.num_heads =8
-        self.feature_decoder = nn.Transformer(nhead=16, num_encoder_layers=12,d_model = config.global_feature_dim,batch_first = True)
-        self.spatial_decoder = nn.Transformer(nhead=16, num_encoder_layers=12,d_model = config.global_feature_dim,batch_first = True)
-        self.source_heads = nn.Parameter(torch.randn([self.num_heads,config.global_feature_dim]))
+        self.num_heads = width
+        feature_dim = dim
+        
+        self.relation_extractor = None
+        self.propoerty_extractor = None
+
+        self.feature_decoder = nn.Transformer(nhead=16, num_encoder_layers=12,d_model = feature_dim,batch_first = True, dim_feedforward = 128)
+        self.spatial_decoder = nn.Transformer(nhead=16, num_encoder_layers=12,d_model = feature_dim,batch_first = True, dim_feedforward = 128)
+        self.source_heads = nn.Parameter(torch.randn([self.num_heads,feature_dim]))
     
     def forward(self, input_graph):
-        B = 4; M  =  20; N  = self.num_heads, C = 64
+    
         # [Feature Propagation]
-        component_features = None
-        component_spaitals = None
+        features = input_graph["features"]
+        spatials = input_graph["centroids"]
+        masks = input_graph["masks"]
 
         # [Decode Proposals]
         global_feature = 0
@@ -264,13 +293,16 @@ class AbstractNet(nn.Module):
 
         # [Component Matching]
         # component_features : [B,M,C]
+        component_features = torch.cat([features, spatials])
+
         # feature_proposals  : [B,N,C]
+        proposal_features = torch.cat([feature_proposals,spaital_proposals])
 
         match = torch.softmax(torch.einsum("bnc,bmc -> bnm",component_features, proposal_features)/math.sqrt(C), dim = -1)
         existence = torch.max(match, dim = 1).values  # [B, N, 1]
 
         # [Construct Representation]
-        output_graph = 0
+        output_graph = {"features":0, "masks":existence, "edge":match}
 
         return output_graph
 
@@ -279,7 +311,21 @@ class SceneTreeNet(nn.Module):
         super().__init__()
         self.backbone = PSGNet(imsize = config.imsize, perception_size = config.perception_size)
 
+        self.abstract_layers = nn.ModuleList([
+            AbstractNet(73, 10)
+        ])
+
     def forward(self, ims):
         primary_scene = self.backbone(ims)
-        abstract_scene = primary_scene
+
+        psg_features = to_dense_features(primary_scene)
+
+        base_graph = psg_features[-1]
+
+        working_graph = base_graph
+        abstract_scene = [working_graph]
+        for abstract_net in self.abstract_layers:
+            working_graph = abstract_net(working_graph)
+            abstract_scene.append(working_graph)
+        
         return abstract_scene
