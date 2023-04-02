@@ -299,8 +299,10 @@ class AbstractNet(nn.Module):
         adj = torch.ones([B,N,N,1])
         #TODO: implement a non trivial solution!
         
+        """
         plateau_maps = self.propagator(features, adj)
         features = plateau_maps[-1]
+        """
 
         # features after the graph propagation
 
@@ -342,6 +344,8 @@ class SceneTreeNet(nn.Module):
         self.abstract_layers = nn.ModuleList([
             AbstractNet(64, 10)
         ])
+
+    def load_backbone(self,backbone):self.backbone = backbone
 
     def forward(self, ims):
         primary_scene = self.backbone(ims)

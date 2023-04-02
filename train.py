@@ -62,6 +62,9 @@ def train(model, config, args):
     # [joint training of perception and language]
     alpha = args.alpha
     beta  = args.beta
+    if args.training_mode == "query":alpha = 0
+    if args.training_mode == "perception":beta = 0
+    
 
     # [setup the optimizer and lr schedulr]
     if args.optimizer == "Adam":
@@ -144,6 +147,9 @@ def train(model, config, args):
             writer.add_scalar("language_loss", language_loss, itrs)
 
             if not(itrs % args.checkpoint_itrs):
+                name = args.name
+                expr = args.training_mode
+                torch.save(model, "checkpoints/{}_{}_{}_{}.ckpt".format(name,expr,config.domain,config.perception))
                 log_imgs(config.imsize,pred_img.cpu().detach(), clusters, gt_ims.reshape([args.batch_size,config.imsize ** 2,3]).cpu().detach(),writer,itrs)
                 
                 visualize_image_grid(gt_ims.flatten(start_dim = 0, end_dim = 1).cpu().detach(), row = args.batch_size, save_name = "ptr_gt_perception")
