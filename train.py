@@ -106,7 +106,7 @@ def train(model, config, args):
                         abstract_scene  = outputs["abstract_scene"]
                         top_level_scene = abstract_scene[-1]
                         scores   = top_level_scene["masks"][b,...] - EPS
-                        print(scores)
+
                         features = top_level_scene["features"][b]
 
 
