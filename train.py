@@ -43,7 +43,8 @@ def log_imgs(imsize,pred_img,clusters,gt_img,writer,iter_):
     visualize_image_grid(pred_img.reshape(batch_size,imsize,imsize,3)[0,...], row = 1, save_name = "val_recon")
 
 def train(model, config, args):
-    print("\nstart the experiment: {}".format(args.name))
+    query = True if args.training_mode in ["joint", "query"] else False
+    print("\nstart the experiment: {} query:[{}]".format(args.name,query))
     print("experiment config: \nepoch: {} \nbatch: {} samples \nlr: {}\n".format(args.epoch,args.batch_size,args.lr))
     
     #[setup the training and validation dataset]
@@ -51,15 +52,16 @@ def train(model, config, args):
         train_dataset = PTRData("train", resolution = config.resolution)
         val_dataset =  PTRData("val", resolution = config.resolution)
     if args.dataset == "toy":
-        train_dataset = ToyData("train", resolution = config.resolution)
+        if query:
+            train_dataset = ToyDataWithQuestions("train", resolution = config.resolution)
+        else:
+            train_dataset = ToyData("train", resolution = config.resolution)
 
     dataloader = DataLoader(train_dataset, batch_size = args.batch_size, shuffle = args.shuffle)
 
     # [joint training of perception and language]
     alpha = args.alpha
     beta  = args.beta
-    
-    query = True if args.training_mode in ["joint", "query"] else False
 
     # [setup the optimizer and lr schedulr]
     if args.optimizer == "Adam":
@@ -96,7 +98,31 @@ def train(model, config, args):
             # [language query module training]
             language_loss = 0
             if query:
-                language_loss += 0
+                for question in sample["question"]:
+                    for b in range(len(question["program"])):
+                        program = question["program"][b] # string program
+                        answer  = question["answer"][b]  # string answer
+
+                        scores   = outputs["object_scores"][b,...,0] - EPS
+                        features = outputs["object_features"][b]
+
+                        edge = 1e-6
+                        if config.concept_type == "box":
+                            features = torch.cat([features,edge * torch.ones(features.shape)],-1)
+
+                        kwargs = {"features":features,
+                                  "end":scores }
+
+                        q = model.executor.parse(program)
+                        
+                        o = model.executor(q, **kwargs)
+                        #print("Batch:{}".format(b),q,o["end"],answer)
+                        if answer in numbers:
+                            int_num = torch.tensor(numbers.index(answer)).float().to(config.device)
+                            language_loss += F.mse_loss(int_num + 1,o["end"])
+                        if answer in yes_or_no:
+                            if answer == "yes":language_loss -= F.logsigmoid(o["end"])
+                            else:language_loss -= torch.log(1 - torch.sigmoid(o["end"]))
 
             # [calculate the working loss]
             working_loss = perception_loss * alpha + language_loss * beta
@@ -154,7 +180,7 @@ argparser.add_argument("--checkpoint_dir",          default = False)
 argparser.add_argument("--checkpoint_itrs",         default = 10)
 argparser.add_argument("--pretrain_perception",     default = False)
 
-args = argparser.parse_args(args = [])
+args = argparser.parse_args()
 
 if args.checkpoint_dir:
     model = torch.load(args.checkpoint_dir, map_location = config.device)

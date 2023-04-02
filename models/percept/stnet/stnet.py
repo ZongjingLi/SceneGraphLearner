@@ -10,6 +10,8 @@ from torch_geometric.data  import Data,Batch
 from torch_geometric.utils import grid, to_dense_batch
 from torch_scatter import scatter_mean,scatter_max
 
+from models.percept.stnet.propagation import GraphPropagation
+
 from .convnet               import *
 from .affinities            import *
 from .primary               import * 
@@ -256,55 +258,78 @@ def to_dense_features(outputs):
     moments = outputs["moments"]
     level_features = []
     for i in range(len(features)):
+        sparse_feature = features[i]
+        sparse_centroid = centroids[i]
+        sparse_moment = moments[i]
+
+
         cast_batch = level_batch[i]
 
-        feature,  _ = to_dense_batch(features[i],cast_batch)
-        centroid, _ = to_dense_batch(centroids[i],cast_batch)
-        moment,   _ = to_dense_batch(moments[i],cast_batch)
+        feature,  batch = to_dense_batch(features[i],cast_batch)
+        centroid, batch = to_dense_batch(centroids[i],cast_batch)
+        moment,   batch = to_dense_batch(moments[i],cast_batch)
 
-        level_features.append({"features":feature, "centroids":centroid, "moments":moment})
+
+        level_features.append({"features":feature, "centroids":centroid, "moments":moment,"masks":batch.int()})
     return level_features
 
 class AbstractNet(nn.Module):
-    def __init__(self,dim = 72, width = 10):
+    def __init__(self,dim = 72, width = 10, iters = 10):
         super().__init__()
         
         self.num_heads = width
         feature_dim = dim
         
-        self.relation_extractor = None
-        self.propoerty_extractor = None
 
-        self.feature_decoder = nn.Transformer(nhead=16, num_encoder_layers=12,d_model = feature_dim,batch_first = True, dim_feedforward = 128)
-        self.spatial_decoder = nn.Transformer(nhead=16, num_encoder_layers=12,d_model = feature_dim,batch_first = True, dim_feedforward = 128)
-        self.source_heads = nn.Parameter(torch.randn([self.num_heads,feature_dim]))
-    
+        self.propagator = GraphPropagation(num_iters = iters)
+        self.feature_heads = nn.Parameter(torch.randn([width, dim]))
+        self.spatial_heads = nn.Parameter(torch.randn([width, 2]))
+
+        self.transfer = FCBlock(100,2,dim,dim)
+
+
     def forward(self, input_graph):
-    
         # [Feature Propagation]
-        features = input_graph["features"]
-        spatials = input_graph["centroids"]
-        masks = input_graph["masks"]
+        features =  input_graph["features"]
+        spatials =  input_graph["centroids"]
+        masks    =  input_graph["masks"]
+        B, N, C = features.shape
 
-        # [Decode Proposals]
-        global_feature = 0
-        feature_proposals = self.feature_decoder(global_feature)
-        spaital_proposals = self.spatial_decoder(global_feature)
+        # [Build Adjacency Matric]
+        adj = torch.ones([B,N,N,1])
+        #TODO: implement a non trivial solution!
+        
+        plateau_maps = self.propagator(features, adj)
+        features = plateau_maps[-1]
+
+        # features after the graph propagation
+
+        # [Decode the Matching Head for the input graph]
+        # TODO: actually implement a version that is context dependent
+
+        feature_proposals = self.feature_heads.unsqueeze(0).repeat(B, 1, 1)
+        spatial_proposals = torch.sigmoid(self.spatial_heads).unsqueeze(0).repeat(B, 1, 1)
 
         # [Component Matching]
-        # component_features : [B,M,C]
-        component_features = torch.cat([features, spatials])
 
-        # feature_proposals  : [B,N,C]
-        proposal_features = torch.cat([feature_proposals,spaital_proposals])
+        # component_features : [B,N,C]
+        component_features = torch.cat([features, spatials], -1)
+
+        # feature_proposals  : [B,M,C]
+        proposal_features = torch.cat([feature_proposals,spatial_proposals], -1)
+
 
         match = torch.softmax(torch.einsum("bnc,bmc -> bnm",component_features, proposal_features)/math.sqrt(C), dim = -1)
-        existence = torch.max(match, dim = 1).values  # [B, N, 1]
+        match = match * (masks.unsqueeze(-1))
 
-        # [Construct Representation]
-        output_graph = {"features":0, "masks":existence, "edge":match}
+        output_features = torch.einsum("bnc,bnm->bmc",self.transfer(features), match)
+        existence = torch.max(match, dim = 1).values
 
+        out_centroids = torch.einsum("bnk,bnm->bmk",spatials,match)
+
+        output_graph = {"features":output_features, "centroids":out_centroids, "masks":existence, "edge":match}
         return output_graph
+
 
 class SceneTreeNet(nn.Module):
     def __init__(self, config):
@@ -312,7 +337,7 @@ class SceneTreeNet(nn.Module):
         self.backbone = PSGNet(imsize = config.imsize, perception_size = config.perception_size)
 
         self.abstract_layers = nn.ModuleList([
-            AbstractNet(73, 10)
+            AbstractNet(64, 10)
         ])
 
     def forward(self, ims):
@@ -328,4 +353,5 @@ class SceneTreeNet(nn.Module):
             working_graph = abstract_net(working_graph)
             abstract_scene.append(working_graph)
         
-        return abstract_scene
+        primary_scene["abstract_scene"] = abstract_scene
+        return primary_scene
