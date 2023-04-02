@@ -101,6 +101,9 @@ class Scene(SymbolicProgram):
         features = executor.kwargs["features"]
         #logit = torch.ones(features.shape[0] ,device = features.device) * self.BIG_NUMBER
         score = executor.kwargs["end"]
+
+        scene_tree= executor.kwargs["features"]
+
         logit = torch.log(score / (1 - score))
         return {"end":logit}
 
