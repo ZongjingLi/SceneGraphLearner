@@ -321,8 +321,8 @@ class AbstractNet(nn.Module):
         proposal_features = torch.cat([feature_proposals,spatial_proposals], -1)
 
 
-        match = torch.softmax(torch.einsum("bnc,bmc -> bnm",component_features, proposal_features)/math.sqrt(C), dim = -1)
-        match = match * (masks.unsqueeze(-1))
+        match = torch.softmax((masks.unsqueeze(-1)) * torch.einsum("bnc,bmc -> bnm",component_features, proposal_features)/math.sqrt(C), dim = -1)
+    
 
         output_features = torch.einsum("bnc,bnm->bmc",self.transfer(features), match)
 
