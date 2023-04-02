@@ -103,8 +103,12 @@ def train(model, config, args):
                         program = question["program"][b] # string program
                         answer  = question["answer"][b]  # string answer
 
-                        scores   = outputs["object_scores"][b,...,0] - EPS
-                        features = outputs["object_features"][b]
+                        abstract_scene  = outputs["abstract_scene"]
+                        top_level_scene = abstract_scene[-1]
+                        scores   = top_level_scene["masks"][b,...] - EPS
+                        print(scores)
+                        features = top_level_scene["features"][b]
+
 
                         edge = 1e-6
                         if config.concept_type == "box":
@@ -119,7 +123,7 @@ def train(model, config, args):
                         #print("Batch:{}".format(b),q,o["end"],answer)
                         if answer in numbers:
                             int_num = torch.tensor(numbers.index(answer)).float().to(config.device)
-                            language_loss += F.mse_loss(int_num + 1,o["end"])
+                            language_loss += F.mse_loss(int_num + 1,o["end"]) * 0
                         if answer in yes_or_no:
                             if answer == "yes":language_loss -= F.logsigmoid(o["end"])
                             else:language_loss -= torch.log(1 - torch.sigmoid(o["end"]))
@@ -147,7 +151,7 @@ def train(model, config, args):
 
             itrs += 1
 
-            sys.stdout.write ("\rEpoch: {}, Itrs: {} Loss: {}, Time: {}".format(epoch + 1, itrs, working_loss,datetime.timedelta(seconds=time.time() - start)))
+            sys.stdout.write ("\rEpoch: {}, Itrs: {} Loss: {} Percept:{} Language:{}, Time: {}".format(epoch + 1, itrs, working_loss,perception_loss,language_loss,datetime.timedelta(seconds=time.time() - start)))
     
     print("\n\nExperiment {} : Training Completed.".format(args.name))
 
@@ -164,8 +168,8 @@ argparser.add_argument("--dataset",                 default = "toy")
 
 # [perception and language grounding training]
 argparser.add_argument("--training_mode",           default = "perception")
-argparser.add_argument("--alpha",                   default = 1.0)
-argparser.add_argument("--beta",                    default = 1.0)
+argparser.add_argument("--alpha",                   default = 1.000)
+argparser.add_argument("--beta",                    default = 0.001)
 
 # [additional training details]
 argparser.add_argument("--warmup",                  default = False)

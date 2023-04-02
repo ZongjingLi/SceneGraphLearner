@@ -20,7 +20,7 @@ parser.add_argument("--hidden_dim",         default = 100)
 
 # setup the concept learner 
 parser.add_argument("--concept_type",       default = "cone")
-parser.add_argument("--concept_dim",        default = 100)
+parser.add_argument("--concept_dim",        default = 64)
 parser.add_argument("--temperature",        default = 5)
 
 # box concept methods

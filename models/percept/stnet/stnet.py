@@ -323,7 +323,10 @@ class AbstractNet(nn.Module):
         match = match * (masks.unsqueeze(-1))
 
         output_features = torch.einsum("bnc,bnm->bmc",self.transfer(features), match)
+
+
         existence = torch.max(match, dim = 1).values
+
 
         out_centroids = torch.einsum("bnk,bnm->bmk",spatials,match)
 
