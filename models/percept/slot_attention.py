@@ -1,0 +1,15 @@
+import torch
+import torch.nn as nn
+
+class SlotAttentionSceneParser(nn.Module):
+    def __init__(self, config):
+        super().__init__()
+        self.config = config
+    
+    def forward(self, ims):
+        return ims
+
+class SlotAttentionRecursiveParser(nn.Module):
+    def __init__(self, config):
+        super().__init__()
+        self.config = config
