@@ -155,6 +155,8 @@ def train(model, config, args):
                 visualize_image_grid(gt_ims.flatten(start_dim = 0, end_dim = 1).cpu().detach(), row = args.batch_size, save_name = "ptr_gt_perception")
                 visualize_image_grid(gt_ims[0].cpu().detach(), row = 1, save_name = "val_gt_image")
 
+                visualize_scene()
+
             itrs += 1
 
             sys.stdout.write ("\rEpoch: {}, Itrs: {} Loss: {} Percept:{} Language:{}, Time: {}".format(epoch + 1, itrs, working_loss,perception_loss,language_loss,datetime.timedelta(seconds=time.time() - start)))

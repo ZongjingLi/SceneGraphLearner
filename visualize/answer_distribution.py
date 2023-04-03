@@ -13,6 +13,10 @@ def visualize_image_grid(images, row, save_name = "image_grid"):
     plt.imshow(comps_grid.cpu().detach().numpy())
     plt.savefig("outputs/{}.png".format(save_name), bbox_inches='tight', pad_inches=0)
 
+
+def visualize_scene_(scene_tree,effective_level):
+    pass
+
 def visualize_outputs(image, outputs):
 
     full_recon = outputs["full_recons"]
