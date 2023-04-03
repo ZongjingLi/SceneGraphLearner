@@ -14,7 +14,15 @@ def visualize_image_grid(images, row, save_name = "image_grid"):
     plt.savefig("outputs/{}.png".format(save_name), bbox_inches='tight', pad_inches=0)
 
 
-def visualize_scene(gt_img,scene_tree,effective_level):
+def visualize_scene(gt_img, scene_tree, effective_level = 0):
+    assert len(scene_tree) >= effective_level,print("Effective Level Larger than Scene Graph")
+    for i in range(effective_level):
+        level_idx = effective_level - i
+        masks = scene_tree[effective_level]["masks"]
+
+        visualize_scores(scene_tree[effective_level]["masks"][0:1].cpu().detach(),"{}".format(level_idx) )
+
+def visualize_tree(gt_img,scene_tree,effective_level):
     """
     only visualize single image case!
     """
@@ -102,7 +110,7 @@ def visualize_distribution(values):
     keys = list(range(len(values)))
     plt.bar(keys,values)
 
-def visualize_scores(scores):
+def visualize_scores(scores, name = "set"):
     batch_size = scores.shape[0]
     score_size = scores.shape[1]
 
@@ -124,7 +132,7 @@ def visualize_scores(scores):
         plt.tick_params(left = False, right = False , labelleft = True ,
                 labelbottom = False, bottom = False)
 
-    plt.savefig("outputs/scores.png")
+    plt.savefig("outputs/scores_{}.png".format(name))
 
 
 # From SRN utils, just formats a flattened image for image writing

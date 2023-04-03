@@ -269,7 +269,7 @@ def to_dense_features(outputs, size = 128):
         centroid, batch = to_dense_batch(centroids[i],cast_batch)
         moment,   _batch = to_dense_batch(moments[i],cast_batch)
 
-        
+        """
         cluster_r = clusters[i][0]; 
         batch_r = clusters[i][1]
         for cluster_j,batch_j in reversed(clusters[:i]):
@@ -286,9 +286,9 @@ def to_dense_features(outputs, size = 128):
         local_masks = local_masks[batch]
 
         local_masks = local_masks.reshape([batch_size, size, size, cluster_size]).permute([0,3,1,2])
+        """
 
-
-        level_features.append({"features":feature, "centroids":centroid, "moments":moment,"masks":_batch.int(),"local_masks":local_masks})
+        level_features.append({"features":feature, "centroids":centroid, "moments":moment,"masks":_batch.int(),"local_masks":0})
     return level_features
 
 
@@ -341,7 +341,7 @@ class AbstractNet(nn.Module):
         proposal_features = torch.cat([feature_proposals,spatial_proposals], -1)
 
  
-        match = torch.softmax(masks.unsqueeze(-1) * torch.einsum("bnc,bmc -> bnm",component_features, proposal_features)/math.sqrt(C), dim = -1)
+        match = torch.softmax(masks.unsqueeze(-1) * torch.einsum("bnc,bmc -> bnm",component_features, proposal_features)/math.sqrt(1), dim = -1)
     
 
         output_features = torch.einsum("bnc,bnm->bmc",self.transfer(features), match)
@@ -356,11 +356,11 @@ class AbstractNet(nn.Module):
 
         # calculate the local mask for visualization
 
-        input_local_masks = input_graph["local_masks"]
+        #input_local_masks = input_graph["local_masks"]
         #print(input_local_masks.shape, match.shape)
         #input_local_masks = torch.ones([B,N,128,128])
         #print(input_local_masks.shape)
-        output_local_masks = torch.einsum("bnwh,bnm->bmwh",input_local_masks,match)
+        output_local_masks = 0#torch.einsum("bnwh,bnm->bmwh",input_local_masks,match)
         
         output_graph = {"features":output_features, "centroids":out_centroids, "masks":existence, "edge":match, "local_masks":output_local_masks}
         return output_graph
