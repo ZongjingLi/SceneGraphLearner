@@ -341,9 +341,17 @@ class SlotAttentionParser(nn.Module):
 class SlotAttentionRecursiveParser(nn.Module):
     def __init__(self, config):
         super().__init__()
+        self.scene_parsers = nn.ModuleList([
+            SlotAttentionParser(config)
+        ])
+        self.effective_level = 1
     
     def forward(self,x):
-        return x
+        abstract_scene = []
+        for parser in self.scene_parsers:
+            outputs = parser(x)
+            abstract_scene.append({})
+        return abstract_scene
 
 
 class FeatureDecoder64(nn.Module):

@@ -1,3 +1,4 @@
+from ntpath import join
 from types import SimpleNamespace
 
 import torch
@@ -299,6 +300,7 @@ class AbstractNet(nn.Module):
         
         self.num_heads = width
         feature_dim = dim
+        self.feature_dim = dim
         
 
         self.propagator = GraphPropagation(num_iters = iters)
@@ -310,13 +312,14 @@ class AbstractNet(nn.Module):
 
     def forward(self, input_graph):
         # [Feature Propagation]
-        features =  input_graph["features"]
-        spatials =  input_graph["centroids"]
+        raw_features =  input_graph["features"]
+        raw_spatials =  input_graph["centroids"]
         masks    =  input_graph["masks"]
-        B, N, C = features.shape
+        B, N, C = raw_features.shape
 
         # [Build Adjacency Matric]
-        adj = torch.ones([B,N,N,1])
+        adjs = torch.zeros([B,N,N,1])
+
         #TODO: implement a non trivial solution!
         #print("B:{} N:{} C:{}".format(B,N,C))
         """
@@ -325,6 +328,12 @@ class AbstractNet(nn.Module):
         """
 
         # features after the graph propagation
+
+        joint_feature = torch.cat([raw_features,raw_spatials],-1)
+
+        joint_feature = self.propagator(joint_feature,adjs)[-1]
+
+        features, spatials = torch.split(joint_feature, [C, 2], dim = -1)
 
         # [Decode the Matching Head for the input graph]
         # TODO: actually implement a version that is context dependent
@@ -341,7 +350,7 @@ class AbstractNet(nn.Module):
         proposal_features = torch.cat([feature_proposals,spatial_proposals], -1)
 
  
-        match = torch.softmax(masks.unsqueeze(-1) * torch.einsum("bnc,bmc -> bnm",component_features, proposal_features)/math.sqrt(1), dim = -1)
+        match = torch.softmax(masks.unsqueeze(-1) * torch.einsum("bnc,bmc -> bnm",component_features, proposal_features)/math.sqrt(0.001), dim = -1)
     
 
         output_features = torch.einsum("bnc,bnm->bmc",self.transfer(features), match)
@@ -362,7 +371,7 @@ class AbstractNet(nn.Module):
         #print(input_local_masks.shape)
         output_local_masks = 0#torch.einsum("bnwh,bnm->bmwh",input_local_masks,match)
         
-        output_graph = {"features":output_features, "centroids":out_centroids, "masks":existence, "edge":match, "local_masks":output_local_masks}
+        output_graph = {"features":output_features, "centroids":out_centroids, "masks":existence, "match":match, "local_masks":output_local_masks, "moments":input_graph["moments"]}
         return output_graph
 
 

@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 
 import torch
 import torchvision
+from matplotlib.patches import Rectangle
 
 def visualize_image_grid(images, row, save_name = "image_grid"):
     plt.figure(save_name, frameon = False);plt.cla()
@@ -12,6 +13,53 @@ def visualize_image_grid(images, row, save_name = "image_grid"):
 
     plt.imshow(comps_grid.cpu().detach().numpy())
     plt.savefig("outputs/{}.png".format(save_name), bbox_inches='tight', pad_inches=0)
+
+
+
+def visualize_psg(gt_img, scene_tree, effective_level = 1,):
+    scale = gt_img.shape[1]
+    assert len(scene_tree) >= effective_level,print("Effective Level Larger than Scene Graph")
+    for i in range(effective_level):
+        level_idx = effective_level - i
+        masks = scene_tree[effective_level]["masks"]
+
+        visualize_scores(scene_tree[effective_level]["masks"][0:1].cpu().detach(),"{}".format(level_idx) )
+
+    if effective_level == 1:
+        masks = scene_tree[effective_level]["masks"]
+        for j in range(masks.shape[1]):
+            save_name = "mask_{}_{}".format(level_idx,j+1)
+            plt.figure(save_name, frameon = False);plt.cla()
+            plt.tick_params(left = False, right = False , labelleft = False ,
+                labelbottom = False, bottom = False)
+
+            match = scene_tree[effective_level]["match"][0]
+            centers = scene_tree[effective_level - 1]["centroids"][0]
+            moments = scene_tree[effective_level - 1]["moments"][0]
+            plt.imshow(gt_img[0])
+            for k in range(match.shape[1]):
+                center = centers[k]
+                moment = moments[k]
+                match_score = float(match[k,j].cpu().detach().numpy())
+
+                lower_x = center[0] * scale 
+                lower_y = scale - center[1] * scale
+
+                x_edge = moment[0] * scale /2
+                y_edge = moment[1] * scale /2
+
+                plt.scatter(center[0] * scale, center[1] * scale, alpha = match_score, color = "red")
+
+                """
+                plt.gca().add_patch(Rectangle((lower_x - x_edge,lower_y - y_edge),2 * x_edge,2 *y_edge,
+                    alpha = 1.0,
+                    edgecolor='red',
+                    facecolor='red',
+                    lw=4))
+                """
+                
+            plt.savefig("outputs/details/{}.png".format(save_name), bbox_inches='tight', pad_inches=0)
+
 
 
 def visualize_scene(gt_img, scene_tree, effective_level = 0):

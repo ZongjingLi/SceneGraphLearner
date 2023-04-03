@@ -8,7 +8,7 @@ from datasets import *
 
 from config import *
 from models import *
-from visualize.answer_distribution import visualize_image_grid,lin2img,visualize_scene
+from visualize.answer_distribution import *
 
 from torch.utils.tensorboard import SummaryWriter
 import torchvision
@@ -158,7 +158,7 @@ def train(model, config, args):
                 visualize_image_grid(gt_ims.flatten(start_dim = 0, end_dim = 1).cpu().detach(), row = args.batch_size, save_name = "ptr_gt_perception")
                 visualize_image_grid(gt_ims[0].cpu().detach(), row = 1, save_name = "val_gt_image")
 
-                visualize_scene(gt_ims[0:1].cpu().detach(), outputs["abstract_scene"], args.effective_level)
+                visualize_psg(gt_ims[0:1].cpu().detach(), outputs["abstract_scene"], args.effective_level)
 
             itrs += 1
 
