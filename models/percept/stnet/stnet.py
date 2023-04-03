@@ -251,27 +251,46 @@ class PSGNet(torch.nn.Module):
         "moments":level_moments,
         "batch":level_batch}
 
-def to_dense_features(outputs):
+def to_dense_features(outputs, size = 128):
     level_batch = outputs["batch"]
     features = outputs["features"]
     centroids = outputs["centroids"]
     moments = outputs["moments"]
+    clusters = outputs["clusters"]
     level_features = []
     for i in range(len(features)):
         sparse_feature = features[i]
         sparse_centroid = centroids[i]
         sparse_moment = moments[i]
-
-
+    
         cast_batch = level_batch[i]
 
         feature,  batch = to_dense_batch(features[i],cast_batch)
         centroid, batch = to_dense_batch(centroids[i],cast_batch)
-        moment,   batch = to_dense_batch(moments[i],cast_batch)
+        moment,   _batch = to_dense_batch(moments[i],cast_batch)
+
+        
+        cluster_r = clusters[i][0]; 
+        batch_r = clusters[i][1]
+        for cluster_j,batch_j in reversed(clusters[:i]):
+            cluster_r = cluster_r[cluster_j]
+            batch_r = batch_r[batch_j]
+
+        cluster_size = int(cluster_r.max()) + 1
+        batch_size = int(cast_batch.max()) + 1
+        local_masks = torch.zeros([batch_size*size * size, cluster_size])
+
+        local_masks[cluster_r] = 1.0
+        local_masks,batch = to_dense_batch(local_masks,batch_r)
+        local_masks = local_masks[batch]
+
+        local_masks = local_masks.reshape([batch_size, size, size, cluster_size]).permute([0,3,1,2])
 
 
-        level_features.append({"features":feature, "centroids":centroid, "moments":moment,"masks":batch.int()})
+        level_features.append({"features":feature, "centroids":centroid, "moments":moment,"masks":_batch.int(),"local_masks":local_masks})
     return level_features
+
+
 
 class AbstractNet(nn.Module):
     def __init__(self,dim = 72, width = 10, iters = 10):
@@ -285,7 +304,7 @@ class AbstractNet(nn.Module):
         self.feature_heads = nn.Parameter(torch.randn([width, dim]))
         self.spatial_heads = nn.Parameter(torch.randn([width, 2]))
 
-        self.transfer = FCBlock(100,2,dim,dim)
+        self.transfer = FCBlock(100,1,dim,dim)
 
 
     def forward(self, input_graph):
@@ -298,7 +317,7 @@ class AbstractNet(nn.Module):
         # [Build Adjacency Matric]
         adj = torch.ones([B,N,N,1])
         #TODO: implement a non trivial solution!
-        
+        #print("B:{} N:{} C:{}".format(B,N,C))
         """
         plateau_maps = self.propagator(features, adj)
         features = plateau_maps[-1]
@@ -320,19 +339,28 @@ class AbstractNet(nn.Module):
         # feature_proposals  : [B,M,C]
         proposal_features = torch.cat([feature_proposals,spatial_proposals], -1)
 
-
-        match = torch.softmax((masks.unsqueeze(-1)) * torch.einsum("bnc,bmc -> bnm",component_features, proposal_features)/math.sqrt(C), dim = -1)
+ 
+        match = torch.softmax(masks.unsqueeze(-1) * torch.einsum("bnc,bmc -> bnm",component_features, proposal_features)/math.sqrt(C), dim = -1)
     
 
         output_features = torch.einsum("bnc,bnm->bmc",self.transfer(features), match)
-
+        #print(torch.sum(match,-2))
 
         existence = torch.max(match, dim = 1).values
+
+        #print("e:",existence)
 
 
         out_centroids = torch.einsum("bnk,bnm->bmk",spatials,match)
 
-        output_graph = {"features":output_features, "centroids":out_centroids, "masks":existence, "edge":match}
+        # calculate the local mask for visualization
+
+        #input_local_masks = input_graph["local_masks"]
+        input_local_masks = torch.ones([B,N,128,128])
+        #print(input_local_masks.shape)
+        output_local_masks = torch.einsum("bnwh,bnm->bmwh",input_local_masks,match)
+
+        output_graph = {"features":output_features, "centroids":out_centroids, "masks":existence, "edge":match, "local_masks":output_local_masks}
         return output_graph
 
 

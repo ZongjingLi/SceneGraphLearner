@@ -185,6 +185,9 @@ argparser.add_argument("--decay_steps",             default = 20000)
 argparser.add_argument("--decay_rate",              default = 0.99)
 argparser.add_argument("--shuffle",                 default = True)
 
+# [curriculum training details]
+argparser.add_argument("--working_level",           default = 1)
+
 # [checkpoint location and savings]
 argparser.add_argument("--checkpoint_dir",          default = False)
 argparser.add_argument("--checkpoint_itrs",         default = 10)
