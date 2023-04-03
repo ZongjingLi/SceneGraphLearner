@@ -63,7 +63,8 @@ def generate_toy_dataset(num, resolution = (128,128), questions = False):
 
     # Set up the drawing window
     screen = pygame.display.set_mode(resolution)
-    background_image = pygame.image.load("/Users/melkor/Documents/datasets/bg.webp").convert()
+    bg1 = pygame.image.load("/Users/melkor/Documents/datasets/bg.webp").convert()
+    bg2 = pygame.image.load("/Users/melkor/Documents/datasets/bg2.webp").convert()
 
     # Run until the user asks to quit
     running = True
@@ -80,6 +81,7 @@ def generate_toy_dataset(num, resolution = (128,128), questions = False):
 
         # Fill the background with white
         screen.fill((255, 255, 255))
+        background_image = np.random.choice([bg1,bg2])
         screen.blit(background_image, [0, 0])
         scene = []
 

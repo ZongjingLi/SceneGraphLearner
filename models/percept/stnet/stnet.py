@@ -92,7 +92,7 @@ def optical_flow_motion_mask(video):
     return masks
 
 class PSGNet(torch.nn.Module):
-    def __init__(self,imsize, perception_size):
+    def __init__(self,imsize, perception_size, struct = [1, 1]):
 
         super().__init__()
         device = "cuda:0" if torch.cuda.is_available() else "cpu"
@@ -118,13 +118,10 @@ class PSGNet(torch.nn.Module):
 
 
         # Affinity modules: for now just one of P1 and P2 
-        self.affinity_aggregations = torch.nn.ModuleList([
-            P1AffinityAggregation(),
-            P1AffinityAggregation(),
-            #P2AffinityAggregation(node_feat_size),
-            #P2AffinityAggregation(node_feat_size),
-
-        ])
+        self.affinity_aggregations = torch.nn.ModuleList([])
+        for s in struct:
+            if s == 1: self.affinity_aggregations.append(P1AffinityAggregation())
+            if s == 2: self.affinity_aggregations.append(P2AffinityAggregation())
 
         # Node transforms: function applied on aggregated node vectors
 
@@ -312,13 +309,22 @@ class AbstractNet(nn.Module):
 
     def forward(self, input_graph):
         # [Feature Propagation]
+        
         raw_features =  input_graph["features"]
-        raw_spatials =  input_graph["centroids"]
+        B, N, C = raw_features.shape
+        temperature = C / C
+        raw_spatials =  input_graph["centroids"] * temperature
         masks    =  input_graph["masks"]
+        
         B, N, C = raw_features.shape
 
         # [Build Adjacency Matric]
-        adjs = torch.zeros([B,N,N,1])
+
+
+        adjs = torch.tanh(0.1 * torch.linalg.norm(
+         raw_spatials.unsqueeze(1).repeat(1,N,1,1) - 
+         raw_spatials.unsqueeze(2).repeat(1,1,N,1), dim = -1) / C) 
+        #adjs = torch.zeros([B,N,N,1])
 
         #TODO: implement a non trivial solution!
         #print("B:{} N:{} C:{}".format(B,N,C))
@@ -328,18 +334,23 @@ class AbstractNet(nn.Module):
         """
 
         # features after the graph propagation
+        if 1:
+            self.propagator.num_iters = 10
+            joint_feature = torch.cat([raw_features,raw_spatials],-1)
 
-        joint_feature = torch.cat([raw_features,raw_spatials],-1)
+            joint_feature = self.propagator(joint_feature,adjs)[-1]
 
-        joint_feature = self.propagator(joint_feature,adjs)[-1]
+            features, spatials = torch.split(joint_feature, [C, 2], dim = -1)
+        else:
+            features, spatials = raw_features, raw_spatials
 
-        features, spatials = torch.split(joint_feature, [C, 2], dim = -1)
+        
 
         # [Decode the Matching Head for the input graph]
         # TODO: actually implement a version that is context dependent
 
         feature_proposals = self.feature_heads.unsqueeze(0).repeat(B, 1, 1)
-        spatial_proposals = torch.sigmoid(self.spatial_heads).unsqueeze(0).repeat(B, 1, 1)
+        spatial_proposals = torch.sigmoid(self.spatial_heads).unsqueeze(0).repeat(B, 1, 1) * temperature
 
         # [Component Matching]
 
@@ -350,10 +361,10 @@ class AbstractNet(nn.Module):
         proposal_features = torch.cat([feature_proposals,spatial_proposals], -1)
 
  
-        match = torch.softmax(masks.unsqueeze(-1) * torch.einsum("bnc,bmc -> bnm",component_features, proposal_features)/math.sqrt(0.001), dim = -1)
+        match = torch.softmax(masks.unsqueeze(-1) * torch.einsum("bnc,bmc -> bnm",component_features, proposal_features)/math.sqrt(0.1), dim = -1)
     
 
-        output_features = torch.einsum("bnc,bnm->bmc",self.transfer(features), match)
+        output_features = self.transfer(torch.einsum("bnc,bnm->bmc",features, match))
         #print(torch.sum(match,-2))
 
         existence = torch.max(match, dim = 1).values
@@ -401,3 +412,9 @@ class SceneTreeNet(nn.Module):
         
         primary_scene["abstract_scene"] = abstract_scene
         return primary_scene
+
+class ScenePrimoridalNet(nn.Module):
+    def __init__(self, config):
+        super().__init__()
+        struct = [1,1,2]
+        self.backbone = PSGNet(imsize = config.imsize, perception_size = config.perception_size, struct = struct)

@@ -15,6 +15,13 @@ import torchvision
 from skimage import color
 
 
+def freeze_parameters(model):
+    for param in model.parameters():
+        param.requires_grad = False
+def unfreeze_parameters(model):
+    for param in model.parameters():
+        param.requires_grad = True
+
 def log_imgs(imsize,pred_img,clusters,gt_img,writer,iter_):
 
     batch_size = pred_img.shape[0]
@@ -56,6 +63,9 @@ def train(model, config, args):
             train_dataset = ToyDataWithQuestions("train", resolution = config.resolution)
         else:
             train_dataset = ToyData("train", resolution = config.resolution)
+
+    if args.training_mode == "query":
+        freeze_parameters(model.scene_perception.backbone)
 
     dataloader = DataLoader(train_dataset, batch_size = args.batch_size, shuffle = args.shuffle)
 
@@ -127,9 +137,9 @@ def train(model, config, args):
                         
                         o = model.executor(q, **kwargs)
                         #print("Batch:{}".format(b),q,o["end"],answer)
-                        if answer in numbers:
+                        if answer in numbers and len(q)>2:
                             int_num = torch.tensor(numbers.index(answer)).float().to(config.device)
-                            language_loss += F.mse_loss(int_num + 1,o["end"]) * 0
+                            language_loss += F.mse_loss(int_num + 1,o["end"])
                         if answer in yes_or_no:
                             if answer == "yes":language_loss -= F.logsigmoid(o["end"])
                             else:language_loss -= torch.log(1 - torch.sigmoid(o["end"]))
@@ -208,6 +218,7 @@ else:
 
 if args.pretrain_perception:
     model.scene_perception = torch.load(args.pretrain_perception, map_location = config.device)
+
 
 train(model, config, args)
 

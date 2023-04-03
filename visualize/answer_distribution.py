@@ -33,11 +33,13 @@ def visualize_psg(gt_img, scene_tree, effective_level = 1,):
             plt.tick_params(left = False, right = False , labelleft = False ,
                 labelbottom = False, bottom = False)
 
-            match = scene_tree[effective_level]["match"][0]
-            centers = scene_tree[effective_level - 1]["centroids"][0]
-            moments = scene_tree[effective_level - 1]["moments"][0]
+            match = scene_tree[effective_level]["match"][0].detach().numpy()
+            centers = scene_tree[effective_level - 1]["centroids"][0].detach().numpy()
+            moments = scene_tree[effective_level - 1]["moments"][0].detach().numpy()
             plt.imshow(gt_img[0])
-            for k in range(match.shape[1]):
+
+            """
+            for k in range(match.shape[0]):
                 center = centers[k]
                 moment = moments[k]
                 match_score = float(match[k,j].cpu().detach().numpy())
@@ -47,16 +49,17 @@ def visualize_psg(gt_img, scene_tree, effective_level = 1,):
 
                 x_edge = moment[0] * scale /2
                 y_edge = moment[1] * scale /2
+            """
 
-                plt.scatter(center[0] * scale, center[1] * scale, alpha = match_score, color = "red")
+            plt.scatter(centers[:,0] * scale, scale -centers[:,1] * scale, alpha = match[:,j], color = "purple")
 
-                """
+            """
                 plt.gca().add_patch(Rectangle((lower_x - x_edge,lower_y - y_edge),2 * x_edge,2 *y_edge,
                     alpha = 1.0,
                     edgecolor='red',
                     facecolor='red',
                     lw=4))
-                """
+            """
                 
             plt.savefig("outputs/details/{}.png".format(save_name), bbox_inches='tight', pad_inches=0)
 
