@@ -335,7 +335,7 @@ class AbstractNet(nn.Module):
 
         # features after the graph propagation
         if 1:
-            self.propagator.num_iters = 10
+            self.propagator.num_iters = 15
             joint_feature = torch.cat([raw_features,raw_spatials],-1)
 
             joint_feature = self.propagator(joint_feature,adjs)[-1]
