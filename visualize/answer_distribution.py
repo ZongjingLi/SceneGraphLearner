@@ -14,8 +14,36 @@ def visualize_image_grid(images, row, save_name = "image_grid"):
     plt.savefig("outputs/{}.png".format(save_name), bbox_inches='tight', pad_inches=0)
 
 
-def visualize_scene_(scene_tree,effective_level):
-    pass
+def visualize_scene(gt_img,scene_tree,effective_level):
+    """
+    only visualize single image case!
+    """
+    assert len(scene_tree) >= effective_level,print("Effective Level Larger than Scene Graph")
+    for i in range(effective_level):
+        level_idx = effective_level - i
+        masks = scene_tree[level_idx]["local_masks"]
+
+        for j in range(masks.shape[1]):
+            save_name = "mask_{}_{}".format(level_idx,j+1)
+            plt.figure(save_name, frameon = False);plt.cla()
+            plt.tick_params(left = False, right = False , labelleft = False ,
+                labelbottom = False, bottom = False)
+
+  
+            plt.imshow(masks[0,j,...].cpu().detach().numpy(), cmap="bone")
+            
+            plt.savefig("outputs/details/{}.png".format(save_name), bbox_inches='tight', pad_inches=0)
+    
+            save_name = "comp_{}_{}".format(level_idx,j+1)
+            plt.figure(save_name, frameon = False);plt.cla()
+            plt.tick_params(left = False, right = False , labelleft = False ,
+                labelbottom = False, bottom = False)
+
+            plt.imshow(gt_img[0]/255 * (masks[0,j,...].unsqueeze(-1).cpu().detach().numpy()) )
+            plt.savefig("outputs/details/{}.png".format(save_name), bbox_inches='tight', pad_inches=0)
+
+            visualize_scores(scene_tree[effective_level]["masks"][0:1])
+        
 
 def visualize_outputs(image, outputs):
 

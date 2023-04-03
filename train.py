@@ -8,7 +8,7 @@ from datasets import *
 
 from config import *
 from models import *
-from visualize.answer_distribution import visualize_image_grid,lin2img
+from visualize.answer_distribution import visualize_image_grid,lin2img,visualize_scene
 
 from torch.utils.tensorboard import SummaryWriter
 import torchvision
@@ -108,6 +108,9 @@ def train(model, config, args):
 
                         abstract_scene  = outputs["abstract_scene"]
                         top_level_scene = abstract_scene[-1]
+
+                        working_scene = [top_level_scene]
+
                         scores   = top_level_scene["masks"][b,...] - EPS
 
                         features = top_level_scene["features"][b]
@@ -155,7 +158,7 @@ def train(model, config, args):
                 visualize_image_grid(gt_ims.flatten(start_dim = 0, end_dim = 1).cpu().detach(), row = args.batch_size, save_name = "ptr_gt_perception")
                 visualize_image_grid(gt_ims[0].cpu().detach(), row = 1, save_name = "val_gt_image")
 
-                visualize_scene()
+                visualize_scene(gt_ims[0:1].cpu().detach(), outputs["abstract_scene"], args.effective_level)
 
             itrs += 1
 
@@ -188,7 +191,7 @@ argparser.add_argument("--decay_rate",              default = 0.99)
 argparser.add_argument("--shuffle",                 default = True)
 
 # [curriculum training details]
-argparser.add_argument("--working_level",           default = 1)
+argparser.add_argument("--effective_level",         default = 1)
 
 # [checkpoint location and savings]
 argparser.add_argument("--checkpoint_dir",          default = False)

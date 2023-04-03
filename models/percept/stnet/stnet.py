@@ -278,6 +278,7 @@ def to_dense_features(outputs, size = 128):
 
         cluster_size = int(cluster_r.max()) + 1
         batch_size = int(cast_batch.max()) + 1
+
         local_masks = torch.zeros([batch_size*size * size, cluster_size])
 
         local_masks[cluster_r] = 1.0
@@ -355,11 +356,12 @@ class AbstractNet(nn.Module):
 
         # calculate the local mask for visualization
 
-        #input_local_masks = input_graph["local_masks"]
-        input_local_masks = torch.ones([B,N,128,128])
+        input_local_masks = input_graph["local_masks"]
+        #print(input_local_masks.shape, match.shape)
+        #input_local_masks = torch.ones([B,N,128,128])
         #print(input_local_masks.shape)
         output_local_masks = torch.einsum("bnwh,bnm->bmwh",input_local_masks,match)
-
+        
         output_graph = {"features":output_features, "centroids":out_centroids, "masks":existence, "edge":match, "local_masks":output_local_masks}
         return output_graph
 
