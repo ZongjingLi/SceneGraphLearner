@@ -8,6 +8,11 @@ body {
 
 }
 
+.grid-3col {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+}
+
 .mark {
     height: 24px;
     width: 24px;

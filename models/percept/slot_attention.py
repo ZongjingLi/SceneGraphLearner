@@ -165,19 +165,19 @@ class FeatureDecoder(nn.Module):
     def __init__(self, inchannel,input_channel,object_dim = 100):
         super(FeatureDecoder, self).__init__()
         self.im_size = 128
-        self.conv1 = nn.Conv2d(inchannel + 2, 32, 3, bias=False)
+        self.conv1 = nn.Conv2d(inchannel + 2, 64, 3, bias=False)
         # self.bn1 = nn.BatchNorm2d(32)
-        self.conv2 = nn.Conv2d(32, 32, 3, bias=False)
+        self.conv2 = nn.Conv2d(64, 128, 3, bias=False)
         # self.bn2 = nn.BatchNorm2d(32)
-        self.conv3 = nn.Conv2d(32, 32, 3, bias=False)
+        self.conv3 = nn.Conv2d(128, 128, 3, bias=False)
         # self.bn3 = nn.BatchNorm2d(32)
-        self.conv4 = nn.Conv2d(32, 32, 3, bias=False)
+        self.conv4 = nn.Conv2d(128, 64, 3, bias=False)
         # self.bn4 = nn.BatchNorm2d(32)
         self.celu = nn.CELU()
         self.celu = nn.Sigmoid()
         self.inchannel = inchannel
-        self.conv5_img = nn.Conv2d(32, input_channel, 1)
-        self.conv5_mask = nn.Conv2d(32, 1, 1)
+        self.conv5_img = nn.Conv2d(64, input_channel, 1)
+        self.conv5_mask = nn.Conv2d(64, 1, 1)
 
         x = torch.linspace(-1, 1, self.im_size + 8)
         y = torch.linspace(-1, 1, self.im_size + 8)
@@ -187,11 +187,11 @@ class FeatureDecoder(nn.Module):
         self.register_buffer('y_grid', y_grid.view((1, 1) + y_grid.shape))
         self.bias = 0
 
-        self.object_score_marker  =  nn.Linear(128 * 128 * 32,1)
+        self.object_score_marker  =  nn.Linear(128 * 128 * 64,1)
         #self.object_score_marker   = FCBlock(256,2,64 * 64 * 16,1)
         #self.object_feature_marker = FCBlock(256,3,64 * 64 * 16,object_dim)
         self.object_feature_marker = nn.Linear(inchannel,object_dim)
-        self.conv_features         = nn.Conv2d(32,16,3,2,1)
+        self.conv_features         = nn.Conv2d(64,16,3,2,1)
 
 
     def forward(self, z):
@@ -210,16 +210,16 @@ class FeatureDecoder(nn.Module):
                        self.y_grid.expand(bs, -1, -1, -1), z), dim=1)
         # x (bs, 32, image_h, image_w)
         x = self.conv1(x);x = self.celu(x) 
-        x = torch.clamp(x, min = -100, max = 100)
+        x = torch.clamp(x, min = -320, max = 320)
         # x = self.bn1(x)
         x = self.conv2(x);x = self.celu(x) #self.celu(x)
-        x = torch.clamp(x, min = -100, max = 100)
+        x = torch.clamp(x, min = -320, max = 320)
         # x = self.bn2(x)
         x = self.conv3(x);x = self.celu(x)
-        x = torch.clamp(x, min = -100, max = 100)
+        x = torch.clamp(x, min = -320, max = 320)
         # x = self.bn3(x)
         x = self.conv4(x);x = self.celu(x)
-        x = torch.clamp(x, min = -100, max = 100)
+        x = torch.clamp(x, min = -320, max = 320)
         #x = self.bn4(x)
 
         img = self.conv5_img(x)

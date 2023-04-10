@@ -214,7 +214,11 @@ if args.checkpoint_dir:
     model = torch.load(args.checkpoint_dir, map_location = config.device)
 else:
     print("No checkpoint to load and creating a new model instance")
-    model = SceneLearner(config)
+    if args.name == "TBC":
+        config.perception = "slot_attention"
+        model = SceneLearner(config)
+    else:
+        model = SceneLearner(config)
 
 if args.pretrain_perception:
     model.scene_perception = torch.load(args.pretrain_perception, map_location = config.device)
