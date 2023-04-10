@@ -1,0 +1,133 @@
+<html>
+    <head>
+        <title>Icecrown Citadel</title>
+        <link rel="stylesheet" href="assets/css/iccstyle.css">
+        <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
+    </head>
+    <body class="layout">
+        <header>
+            <div class="container">
+                <i id="logo" class="fa fa-apple" aria-hidden="true"></i>
+                <nav>
+                  <a href="">Mac</a>
+                  <a href="">iPad</a>
+                  <a href="">iPhone</a>
+                  <a href="">Watch</a>
+                  <a href="">TV</a>
+                  <a href="">Music</a>
+                  <a href="">Support</a>
+                </nav>
+                <div class="right">
+                            <span><img id="search" src="assets/ice.png"></span>
+                            <span><img id="red" src="assets/blood.png"></span>
+                            <span><img id="lock" src="assets/unholy.png"></span>   
+                        </div>
+              </div>
+        </header>
+        <aside>
+            <div class="nav-wrapper">
+                <ul class="nav-bar">
+                    <h2>Working</h2>
+                    <div class="image-block">
+                        <img src="assets/rune0.png" alt="Image">
+                        <span href="icecrown_citadel.html"><a>Citadel</a></span>
+                    </div>
+                    <div class="image-block">
+                        <img src="assets/rune1.png" alt="Image">
+                        <span href="icecrown_current_0.html"><a>Construct</a></span>
+                    </div>
+                    <div class="image-block">
+                        <img src="assets/rune2.png" alt="Image">
+                        <span href="icecrown_current_1.html"><a>Forge</a></span>
+                    </div>
+                    <div class="image-block">
+                        <img src="assets/rune3.png" alt="Image">
+                        <span href="icecrown_current_2.html"><a>Reflect</a></span>
+                    </div>
+                    <h2>Framework</h2>
+                    <div class="image-block">
+                        <img src="assets/rune4.png" alt="Image">
+                        <span><a href="icecrown_project_0.html">Scene Learner</a></span>
+                    </div>
+                    <div class="image-block">
+                        <img src="assets/rune5.png" alt="Image">
+                        <span><a href="icecrown_project_1.html">Interactive Model</a></span>
+                    </div>
+                    <div class="image-block">
+                        <img src="assets/rune6.png" alt="Image">
+                        <span><a href="icecrown_project_2.html">PSGNet-Lite</a></span>
+                    </div>
+                    <div class="image-block">
+                        <img src="assets/rune7.png" alt="Image">
+                        <span><a href="icecrown_project_3.html">Projection</a></span>
+                    </div>
+                    <div class="image-block">
+                        <img src="assets/rune8.png" alt="Image">
+                        <span><a href="icecrown_project_4.html">Continuum NeRF</a></span>
+                    </div>
+
+                </ul>
+            </div>
+        </aside>
+        <main>
+            <article>
+                PAC-NeRF (Physics Augmented Continuum Neural Radiance Fields) is a novel approach to estimating both the unknown geometry and physical parameters of highly dynamic objects from multi-view videos.
+                 We design PAC-NeRF to only ever produce physically plausible states by enforcing the neural radiance field to follow the conservation laws of continuum mechanics.
+For this, we design a hybrid Eulerian-Lagrangian representation of the neural radiance field, i.e., we use the Eulerian grid representation for NeRF density and color fields,
+ while advecting the neural radiance fields via Lagrangian particles. This hybrid Eulerian-Lagrangian representation seamlessly blends efficient neural rendering with the material point method (MPM) for robust differentiable physics simulation.
+            </article>
+            
+            <div class="framework">
+                <img src="assets/pac_pipeline.png" height="256">
+            </div>
+            
+            <article>
+                Effect propagation requires multistep message passing along the directed edges in graph G.
+                Forces ejected from ball A (Fig. 2) should be propagated
+                through the connected balls to ball B within a single time
+                step. Force propagation is hard to analyze analytically for
+                complex scenes. Therefore, we let PropNet learn to decide
+                whether an effect should be propagated further or withheld.
+            </article>
+
+            <div class="image-container-grid">
+                <article>
+                    Effect propagation requires multistep message passing along the directed edges in graph G.
+                    Forces ejected from ball A (Fig. 2) should be propagated
+                    through the connected balls to ball B within a single time
+                    step. Force propagation is hard to analyze analytically for
+                    complex scenes. Therefore, we let PropNet learn to decide
+                    whether an effect should be propagated further or withheld.
+                    At time t, we denote the propagating effect from relation
+                    k at propagation step l as el
+                    k,t, and the propagating effect
+                    from object i as hl
+                    i,t. Here, we have 1 ≤ l ≤ L, where L
+                    is the maximum propagation steps within each step of the
+                    simulation. Propagation can be described as
+                </article>
+                
+                <img src="assets/torus.gif" width="256" height="256">
+            
+            </div>
+
+
+            <article>
+                At time t, we denote the propagating effect from relation
+                k at propagation step l as el
+                k,t, and the propagating effect
+                from object i as hl
+                i,t. Here, we have 1 ≤ l ≤ L, where L
+                is the maximum propagation steps within each step of the
+                simulation. Propagation can be described as
+            </article>
+
+
+        </main>
+        <footer>Made by ZongingLi</footer>
+    </body>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.9.4/Chart.js"></script>
+    <script src="js/icc.js"></script>
+
+</html>
