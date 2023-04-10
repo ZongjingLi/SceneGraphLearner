@@ -178,6 +178,134 @@ def train(model, config, args):
 
 
 
+def train_TBC(model, config, args):
+    query = True if args.training_mode in ["joint", "query"] else False
+    print("\nstart the experiment: {} query:[{}]".format(args.name,query))
+    print("experiment config: \nepoch: {} \nbatch: {} samples \nlr: {}\n".format(args.epoch,args.batch_size,args.lr))
+    
+    #[setup the training and validation dataset]
+    if args.dataset == "ptr":
+        train_dataset = PTRData("train", resolution = config.resolution)
+        val_dataset =  PTRData("val", resolution = config.resolution)
+    if args.dataset == "toy":
+        if query:
+            train_dataset = ToyDataWithQuestions("train", resolution = config.resolution)
+        else:
+            train_dataset = ToyData("train", resolution = config.resolution)
+
+    if args.training_mode == "query":
+        freeze_parameters(model.scene_perception.backbone)
+
+    dataloader = DataLoader(train_dataset, batch_size = args.batch_size, shuffle = args.shuffle)
+
+    # [joint training of perception and language]
+    alpha = args.alpha
+    beta  = args.beta
+    if args.training_mode == "query":alpha = 0
+    if args.training_mode == "perception":beta = 0
+    
+
+    # [setup the optimizer and lr schedulr]
+    if args.optimizer == "Adam":
+        optimizer = torch.optim.Adam(model.parameters(), lr = args.lr)
+    if args.optimizer == "RMSprop":
+        optimizer = torch.optim.RMSprop(model.parameters(), lr = args.lr)
+
+    # [start the training process recording]
+    itrs = 0
+    start = time.time()
+    logging_root = "./logs"
+    ckpt_dir     = os.path.join(logging_root, 'checkpoints')
+    events_dir   = os.path.join(logging_root, 'events')
+    if not os.path.exists(ckpt_dir): os.makedirs(ckpt_dir)
+    if not os.path.exists(events_dir): os.makedirs(events_dir)
+    writer = SummaryWriter(events_dir)
+
+    for epoch in range(args.epoch):
+        for sample in dataloader:
+            
+            # [perception module training]
+            gt_ims = torch.tensor(sample["image"].numpy()).float().to(config.device)
+
+            outputs = model.scene_perception(gt_ims)
+            recons, all_losses = outputs["recons"],outputs["losses"]
+
+
+            perception_loss = 0
+
+            for i,pred_img in enumerate(recons[:]):
+                perception_loss += torch.nn.functional.l1_loss(pred_img.flatten(), gt_ims.flatten())
+            
+
+            # [language query module training]
+            language_loss = 0
+            if query:
+                for question in sample["question"]:
+                    for b in range(len(question["program"])):
+                        program = question["program"][b] # string program
+                        answer  = question["answer"][b]  # string answer
+
+                        abstract_scene  = outputs["abstract_scene"]
+                        top_level_scene = abstract_scene[-1]
+
+                        working_scene = [top_level_scene]
+
+                        scores   = top_level_scene["masks"][b,...] - EPS
+
+                        features = top_level_scene["features"][b]
+
+
+                        edge = 1e-6
+                        if config.concept_type == "box":
+                            features = torch.cat([features,edge * torch.ones(features.shape)],-1)
+
+                        kwargs = {"features":features,
+                                  "end":scores }
+
+                        q = model.executor.parse(program)
+                        
+                        o = model.executor(q, **kwargs)
+                        #print("Batch:{}".format(b),q,o["end"],answer)
+                        if answer in numbers and len(q)>2:
+                            int_num = torch.tensor(numbers.index(answer)).float().to(config.device)
+                            language_loss += F.mse_loss(int_num + 1,o["end"])
+                        if answer in yes_or_no:
+                            if answer == "yes":language_loss -= F.logsigmoid(o["end"])
+                            else:language_loss -= torch.log(1 - torch.sigmoid(o["end"]))
+
+            # [calculate the working loss]
+            working_loss = perception_loss * alpha + language_loss * beta
+
+            # [backprop and optimize parameters]
+            optimizer.zero_grad()
+            working_loss.backward()
+            optimizer.step()
+
+            for i,losses in enumerate(all_losses):
+                for loss_name,loss in losses.items():
+                    writer.add_scalar(str(i)+loss_name, loss, itrs)
+            writer.add_scalar("working_loss", working_loss, itrs)
+            writer.add_scalar("perception_loss", perception_loss, itrs)
+            writer.add_scalar("language_loss", language_loss, itrs)
+
+            if not(itrs % args.checkpoint_itrs):
+                name = args.name
+                expr = args.training_mode
+                torch.save(model, "checkpoints/{}_{}_{}_{}.ckpt".format(name,expr,config.domain,config.perception))
+                log_imgs(config.imsize,pred_img.cpu().detach(), clusters, gt_ims.reshape([args.batch_size,config.imsize ** 2,3]).cpu().detach(),writer,itrs)
+                
+                visualize_image_grid(gt_ims.flatten(start_dim = 0, end_dim = 1).cpu().detach(), row = args.batch_size, save_name = "ptr_gt_perception")
+                visualize_image_grid(gt_ims[0].cpu().detach(), row = 1, save_name = "val_gt_image")
+
+                visualize_psg(gt_ims[0:1].cpu().detach(), outputs["abstract_scene"], args.effective_level)
+
+            itrs += 1
+
+            sys.stdout.write ("\rEpoch: {}, Itrs: {} Loss: {} Percept:{} Language:{}, Time: {}".format(epoch + 1, itrs, working_loss,perception_loss,language_loss,datetime.timedelta(seconds=time.time() - start)))
+    
+    print("\n\nExperiment {} : Training Completed.".format(args.name))
+
+
 argparser = argparse.ArgumentParser()
 # [general config of the training]
 argparser.add_argument("--name",                    default = "KFT")
@@ -224,5 +352,7 @@ if args.pretrain_perception:
     model.scene_perception = torch.load(args.pretrain_perception, map_location = config.device)
 
 
-train(model, config, args)
-
+if args.name == "TBC":
+    train_TBC(model, config, args)
+else:
+    train(model, config, args)
