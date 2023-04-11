@@ -257,11 +257,13 @@ def train_TBC(model, config, args):
                         
                         o = model.executor(q, **kwargs)
                         #print("Batch:{}".format(b),q,o["end"],answer)
+                        
                         if answer in numbers:
                             int_num = torch.tensor(numbers.index(answer)).float().to(args.device)
                             query_loss += F.mse_loss(int_num + 1,o["end"])
                             if itrs % args.checkpoint_itrs == 0:
-                                answer_distribution_num(o["end"].detach().numpy(),int_num.detach().numpy())
+                                pass
+                                answer_distribution_num(o["end"].detach().numpy()-1,int_num.detach().numpy())
                         if answer in yes_or_no:
                             if answer == "yes":query_loss -= F.logsigmoid(o["end"])
                             else:query_loss -= torch.log(1 - torch.sigmoid(o["end"]))

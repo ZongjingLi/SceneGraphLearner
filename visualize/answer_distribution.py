@@ -187,35 +187,37 @@ def visualize_scores(scores, name = "set"):
 
 def answer_distribution_num(count, target, name = "answer_distribution"):
     batch_size = 1
-    score_size = 1
+    score_size = 4
 
     row = batch_size * score_size 
-    col = row / 1
-    plt.figure("dists",frameon = True, figsize = (row,col))
+    col = row / 2
 
+    plt.figure("dists",frameon = False, figsize = (row,col))
+    plt.tick_params(left = True, right = False , labelleft = True ,
+                labelbottom = True, bottom = True)
     plt.cla()
 
     x = np.linspace(0,5,100)
-    y = np.exp( 0 - (x-count) * (x-count) / 2)
+    y = np.exp( 0 - (x-target) * (x-target) / 2)
     plt.plot(x,y)
-    plt.scatter(count,1)
-    plt.scatter(target,np.exp( 0 - (target-count) * (target-count) / 2))
+    plt.scatter(target,1)
+    plt.scatter(count,np.exp( 0 - (target-count) * (target-count) / 2))
 
     plt.savefig("outputs/{}.png".format(name))
     
 
 def answer_distribution_binary(score, name = "answer_distribution"):
     batch_size = 1
-    score_size =2
+    score_size = 4
 
     row = batch_size * score_size 
-    col = row / 4
+    col = row / 2
 
     scores = [score, 1 - score]
 
     plt.figure("dists", frameon = False, figsize = (row,col))
     plt.tick_params(left = True, right = False , labelleft = True ,
-                labelbottom = False, bottom = False)
+                labelbottom = True, bottom = True)
     plt.cla()
     
     for i in range(batch_size):
@@ -223,10 +225,10 @@ def answer_distribution_binary(score, name = "answer_distribution"):
         plt.cla()
 
         
-        keys = list(range(score_size))
+        keys = ["yes","no"]
         plt.bar(keys,scores)
-        plt.tick_params(left = False, right = False , labelleft = True ,
-                labelbottom = False, bottom = False)
+        plt.tick_params(left = True, right = False , labelleft = True ,
+                labelbottom = True, bottom = True)
 
     plt.savefig("outputs/{}.png".format(name))
 

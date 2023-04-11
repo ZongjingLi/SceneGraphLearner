@@ -18,8 +18,13 @@ body {
     grid-template-columns: 1fr 1fr;
     align-items: center;
     align-content: center;
+    margin-bottom: 2%;
 }
 
+.grid-2col img {
+    width: 100%;
+    height: 80%;
+}
 
 .mark {
     height: 24px;
