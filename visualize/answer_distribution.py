@@ -186,16 +186,20 @@ def visualize_scores(scores, name = "set"):
     plt.savefig("outputs/scores_{}.png".format(name))
 
 def answer_distribution_num(count, target, name = "answer_distribution"):
-    plt.figure("dist")
-    plt.tick_params(left = True, right = False , labelleft = True ,
-                labelbottom = False, bottom = False)
+    batch_size = 1
+    score_size = 1
+
+    row = batch_size * score_size 
+    col = row / 1
+    plt.figure("dists",frameon = True, figsize = (row,col))
+
     plt.cla()
 
     x = np.linspace(0,5,100)
-    y = np.exp( 0 - x * x / 2)
+    y = np.exp( 0 - (x-count) * (x-count) / 2)
     plt.plot(x,y)
-    plt.scatter(count,np.exp( 0 - count * count / 2))
-    plt.scatter(target,np.exp( 0 - target * target / 2))
+    plt.scatter(count,1)
+    plt.scatter(target,np.exp( 0 - (target-count) * (target-count) / 2))
 
     plt.savefig("outputs/{}.png".format(name))
     
@@ -209,7 +213,7 @@ def answer_distribution_binary(score, name = "answer_distribution"):
 
     scores = [score, 1 - score]
 
-    plt.figure("scores", frameon = False, figsize = (row,col))
+    plt.figure("dists", frameon = False, figsize = (row,col))
     plt.tick_params(left = True, right = False , labelleft = True ,
                 labelbottom = False, bottom = False)
     plt.cla()

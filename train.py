@@ -247,7 +247,7 @@ def train_TBC(model, config, args):
                         features = outputs["object_features"][b]
 
                         edge = 1e-6
-                        if args.concept_type == "box":
+                        if config.concept_type == "box":
                             features = torch.cat([features,edge * torch.ones(features.shape, device = args.device)],-1)
 
                         kwargs = {"features":features,
@@ -260,11 +260,13 @@ def train_TBC(model, config, args):
                         if answer in numbers:
                             int_num = torch.tensor(numbers.index(answer)).float().to(args.device)
                             query_loss += F.mse_loss(int_num + 1,o["end"])
-                            answer_distribution_num(o["end"].detach().numpy(),int_num.detach().numpy())
+                            if itrs % args.checkpoint_itrs == 0:
+                                answer_distribution_num(o["end"].detach().numpy(),int_num.detach().numpy())
                         if answer in yes_or_no:
                             if answer == "yes":query_loss -= F.logsigmoid(o["end"])
                             else:query_loss -= torch.log(1 - torch.sigmoid(o["end"]))
-                            answer_distribution_binary(F.logsigmoid(o["end"]).detach().numpy())
+                            if itrs % args.checkpoint_itrs == 0:
+                                answer_distribution_binary(F.sigmoid(o["end"]).detach().numpy())
                         #print(scores.float().detach().numpy())
 
                 working_loss += query_loss * 0.003
