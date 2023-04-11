@@ -165,8 +165,8 @@ def visualize_scores(scores, name = "set"):
     batch_size = scores.shape[0]
     score_size = scores.shape[1]
 
-    row = batch_size * score_size / 2
-    col = row / 8
+    row = batch_size * score_size 
+    col = row / 4
 
     plt.figure("scores", frameon = False, figsize = (row,col))
     plt.tick_params(left = True, right = False , labelleft = True ,
@@ -185,6 +185,46 @@ def visualize_scores(scores, name = "set"):
 
     plt.savefig("outputs/scores_{}.png".format(name))
 
+def answer_distribution_num(count, target, name = "answer_distribution"):
+    plt.figure("dist")
+    plt.tick_params(left = True, right = False , labelleft = True ,
+                labelbottom = False, bottom = False)
+    plt.cla()
+
+    x = np.linspace(0,5,100)
+    y = np.exp( 0 - x * x / 2)
+    plt.plot(x,y)
+    plt.scatter(count,np.exp( 0 - count * count / 2))
+    plt.scatter(target,np.exp( 0 - target * target / 2))
+
+    plt.savefig("outputs/{}.png".format(name))
+    
+
+def answer_distribution_binary(score, name = "answer_distribution"):
+    batch_size = 1
+    score_size =2
+
+    row = batch_size * score_size 
+    col = row / 4
+
+    scores = [score, 1 - score]
+
+    plt.figure("scores", frameon = False, figsize = (row,col))
+    plt.tick_params(left = True, right = False , labelleft = True ,
+                labelbottom = False, bottom = False)
+    plt.cla()
+    
+    for i in range(batch_size):
+        plt.subplot(1,batch_size,i + 1,frameon=False)
+        plt.cla()
+
+        
+        keys = list(range(score_size))
+        plt.bar(keys,scores)
+        plt.tick_params(left = False, right = False , labelleft = True ,
+                labelbottom = False, bottom = False)
+
+    plt.savefig("outputs/{}.png".format(name))
 
 # From SRN utils, just formats a flattened image for image writing
 def lin2img(tensor):

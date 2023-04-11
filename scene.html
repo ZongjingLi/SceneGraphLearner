@@ -73,17 +73,49 @@
           <article>
               input structure 
           </article>
-          <div class="grid-3col">
+          <div class="working-project-window-3col">
+            <div class="working-content-grid" >
+                <img src="outputs/val_gt_image.png" height="256">
+                <hr>
+                Ground Truth Img
+            </div>
+            <div class="working-content-grid" >
+                <img src="outputs/val_recon_image.png" height="256">
+                <hr>
+                Reconstruction
+            </div>
+            <div class="working-content-grid">
+                <img src="outputs/val_image.png" height="256">
+                <hr>
+                Nonesense
+            </div>
+        </div>
+        <div class="grid-2col">
               <div>
-                  a
+                  <img src="outputs/comps.png">
               </div>
               <div>
-                  b
+                  <img src="outputs/scores_val_scores.png">
               </div>
-              <div>
-                  c
-              </div>
-          </div>
+        </div>
+
+        <div class="grid-2col">
+            <div>
+                <article>
+                    <b>Question:</b> Is there any house in the scene?
+                    <br>
+                    <b>Program:</b> Exist(Filter(Scene(), House))
+                    <br>
+                    <hr>
+                    Answer: Yes
+                </article>
+            </div>
+            <div>
+                Answer Distribution
+            </div>
+        </div>  
+
+          
 
         </main>
         <footer>Made by ZongingLi</footer>
