@@ -321,7 +321,7 @@ def train_TBC(model, config, args):
                     visualize_image_grid(full_recon[0].cpu().detach(), row = 1, save_name = "val_recon_image")
                     
 
-                    single_comps =  torchvision.utils.make_grid(recons[0:1].cpu().detach().permute([0,1,4,2,3]).flatten(start_dim = 0, end_dim = 1),normalize=True,nrow=num_slots).permute([1,2,0])
+                    single_comps =  torchvision.utils.make_grid((recons*masks)[0:1].cpu().detach().permute([0,1,4,2,3]).flatten(start_dim = 0, end_dim = 1),normalize=True,nrow=num_slots)
                     visualize_image_grid(single_comps.cpu().detach(), row = 1, save_name = "comps")
 
             itrs += 1
