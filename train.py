@@ -187,8 +187,12 @@ def train_TBC(model, config, args):
         dataset = ToyDataWithQuestions("train")
 
     if args.training_mode == "joint":
-        try:model.perception.allow_obj_score()
+        try:
+            print("object score allowed")
+            model.scene_perception.allow_obj_score()
         except:pass
+
+    print("Joint!")
 
     logging_root = "./logs"
     ckpt_dir     = os.path.join(logging_root, 'checkpoints')
@@ -263,12 +267,12 @@ def train_TBC(model, config, args):
                             query_loss += F.mse_loss(int_num + 1,o["end"])
                             if itrs % args.checkpoint_itrs == 0:
                                 pass
-                                answer_distribution_num(o["end"].detach().numpy()-1,int_num.detach().numpy())
+                                answer_distribution_num(o["end"].cpu().detach().numpy()-1,int_num.cpu().detach().numpy())
                         if answer in yes_or_no:
                             if answer == "yes":query_loss -= F.logsigmoid(o["end"])
                             else:query_loss -= torch.log(1 - torch.sigmoid(o["end"]))
                             if itrs % args.checkpoint_itrs == 0:
-                                answer_distribution_binary(F.sigmoid(o["end"]).detach().numpy())
+                                answer_distribution_binary(F.sigmoid(o["end"]).cpu().detach().numpy())
                         #print(scores.float().detach().numpy())
 
                 working_loss += query_loss * 0.003
@@ -321,7 +325,7 @@ def train_TBC(model, config, args):
                     visualize_image_grid(full_recon[0].cpu().detach(), row = 1, save_name = "val_recon_image")
                     
 
-                    single_comps =  torchvision.utils.make_grid((recons*masks)[0:1].cpu().detach().permute([0,1,4,2,3]).flatten(start_dim = 0, end_dim = 1),normalize=True,nrow=num_slots)
+                    single_comps =  torchvision.utils.make_grid((recons*masks)[0:1].cpu().detach().permute([0,1,4,2,3]).flatten(start_dim = 0, end_dim = 1),normalize=True,nrow=num_slots).permute(1,2,0)
                     visualize_image_grid(single_comps.cpu().detach(), row = 1, save_name = "comps")
 
             itrs += 1
@@ -342,13 +346,13 @@ argparser.add_argument("--batch_size",              default = 4)
 argparser.add_argument("--dataset",                 default = "toy")
 
 # [perception and language grounding training]
-argparser.add_argument("--training_mode",           default = "perception")
+argparser.add_argument("--training_mode",           default = "joint")
 argparser.add_argument("--alpha",                   default = 1.000)
 argparser.add_argument("--beta",                    default = 0.001)
 
 # [additional training details]
-argparser.add_argument("--warmup",                  default = False)
-argparser.add_argument("--warmup_steps",            default = 1000)
+argparser.add_argument("--warmup",                  default = True)
+argparser.add_argument("--warmup_steps",            default = 100)
 argparser.add_argument("--decay",                   default = False)
 argparser.add_argument("--decay_steps",             default = 20000)
 argparser.add_argument("--decay_rate",              default = 0.99)

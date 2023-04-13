@@ -65,7 +65,7 @@ def generate_toy_dataset(num, resolution = (128,128), questions = False):
     screen = pygame.display.set_mode(resolution)
     bg1 = pygame.image.load("/Users/melkor/Documents/datasets/bg.webp").convert()
     bg2 = pygame.image.load("/Users/melkor/Documents/datasets/bg2.webp").convert()
-
+    bg1 = bg2
     # Run until the user asks to quit
     running = True
     itr = 0
