@@ -47,7 +47,7 @@ class ToyDataWithQuestions(nn.Module):
             [transforms.ToTensor()]
         )
 
-    def __len__(self): return 1000#len(self.files)
+    def __len__(self): return 3200#len(self.files)
 
     def __getitem__(self,index):
         image = Image.open(os.path.join(self.root_dir,"images","{}.png".format( 1 + index)))

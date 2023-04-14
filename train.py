@@ -266,12 +266,13 @@ def train_TBC(model, config, args):
                             int_num = torch.tensor(numbers.index(answer)).float().to(args.device)
                             query_loss += F.mse_loss(int_num + 1,o["end"])
                             if itrs % args.checkpoint_itrs == 0:
-                                pass
-                                answer_distribution_num(o["end"].cpu().detach().numpy()-1,int_num.cpu().detach().numpy())
+                                print(q,answer)
+                                answer_distribution_num(o["end"].cpu().detach().numpy(),1+int_num.cpu().detach().numpy())
                         if answer in yes_or_no:
                             if answer == "yes":query_loss -= F.logsigmoid(o["end"])
                             else:query_loss -= torch.log(1 - torch.sigmoid(o["end"]))
                             if itrs % args.checkpoint_itrs == 0:
+                                print(q,answer)
                                 answer_distribution_binary(F.sigmoid(o["end"]).cpu().detach().numpy())
                         #print(scores.float().detach().numpy())
 
@@ -381,6 +382,8 @@ else:
 if args.pretrain_perception:
     model.scene_perception = torch.load(args.pretrain_perception, map_location = config.device)
 
+model = torch.load("checkpoints/TBC_joint_toy_slot_attention.ckpt", map_location=args.device)
+model.scene_perception.slot_attention.iters = 10
 
 if args.name == "TBC":
     train_TBC(model, config, args)

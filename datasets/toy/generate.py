@@ -199,4 +199,4 @@ def generate_toy_dataset(num, resolution = (128,128), questions = False):
     
 
 if __name__ == "__main__":
-    generate_toy_dataset(1500, [256,256], True)
+    generate_toy_dataset(3500, [256,256], True)
