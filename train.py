@@ -228,11 +228,12 @@ def train_Archerus(model, config, args):
 
             outputs = model.scene_perception(gt_ims)
             recons, clusters, all_losses = outputs["recons"],outputs["clusters"],outputs["losses"]
-
-
+      
             perception_loss = 0
 
+
             for i,pred_img in enumerate(recons[:]):
+
                 perception_loss += torch.nn.functional.l1_loss(pred_img.flatten(), gt_ims.flatten())
             
 
@@ -363,6 +364,7 @@ def train_TBC(model, config, args):
                 recons     = outputs["recons"]
                 masks      = outputs["masks"]
                 loss       = outputs["loss"]
+
                 if args.training_mode != "query":
                     working_loss += loss * 1000
 
@@ -469,7 +471,7 @@ argparser.add_argument("--name",                    default = "KFT")
 argparser.add_argument("--epoch",                   default = 100)
 argparser.add_argument("--optimizer",               default = "Adam")
 argparser.add_argument("--lr",                      default = 2e-4)
-argparser.add_argument("--batch_size",              default = 4)
+argparser.add_argument("--batch_size",              default = 1)
 argparser.add_argument("--dataset",                 default = "toy")
 
 # [perception and language grounding training]
@@ -514,7 +516,7 @@ if args.pretrain_perception:
 
 if args.name == "TBC":
     train_TBC(model, config, args)
-elif args.name == "Archerus":
+elif args.name == "Acherus":
     print("Assault on New Avalon")
     train_Archerus(model, config, args)
 
