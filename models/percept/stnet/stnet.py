@@ -484,7 +484,9 @@ class SceneGraphNet(nn.Module):
 
         psg_features = to_dense_features(primary_scene)
 
-        
+        abstract_scene = {}
+        primary_scene["abstract_scene"] = abstract_scene
+
         return primary_scene
 
         
