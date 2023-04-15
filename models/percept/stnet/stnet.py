@@ -386,6 +386,15 @@ class AbstractNet(nn.Module):
         return output_graph
 
 
+class SceneGraphLevel(nn.Module):
+    def __init__(self, config):
+        super().__init__()
+        self.backbone = PSGNet(imsize = config.imsize, perception_size = config.perception_size)
+        self.layer_embedding = nn.Embedding()
+
+    def aggregate_features(self,inputs):
+        return {"features":0,"scores":0}
+
 class SceneTreeNet(nn.Module):
     def __init__(self, config):
         super().__init__()
@@ -412,9 +421,3 @@ class SceneTreeNet(nn.Module):
         
         primary_scene["abstract_scene"] = abstract_scene
         return primary_scene
-
-class ScenePrimoridalNet(nn.Module):
-    def __init__(self, config):
-        super().__init__()
-        struct = [1,1,2]
-        self.backbone = PSGNet(imsize = config.imsize, perception_size = config.perception_size, struct = struct)
