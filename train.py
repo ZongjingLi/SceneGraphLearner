@@ -177,7 +177,7 @@ def train(model, config, args):
     
     print("\n\nExperiment {} : Training Completed.".format(args.name))
 
-def train_Archerus(model, config, args):
+def train_Archerus(train_model, config, args):
     query = True if args.training_mode in ["joint", "query"] else False
     print("\nstart the experiment: {} query:[{}]".format(args.name,query))
     print("experiment config: \nepoch: {} \nbatch: {} samples \nlr: {}\n".format(args.epoch,args.batch_size,args.lr))
@@ -193,7 +193,7 @@ def train_Archerus(model, config, args):
             train_dataset = ToyData("train", resolution = config.resolution)
 
     if args.training_mode == "query":
-        freeze_parameters(model.scene_perception.backbone)
+        freeze_parameters(train_model.scene_perception.backbone)
 
     dataloader = DataLoader(train_dataset, batch_size = args.batch_size, shuffle = args.shuffle)
 
@@ -206,9 +206,9 @@ def train_Archerus(model, config, args):
 
     # [setup the optimizer and lr schedulr]
     if args.optimizer == "Adam":
-        optimizer = torch.optim.Adam(model.parameters(), lr = args.lr)
+        optimizer = torch.optim.Adam(train_model.parameters(), lr = args.lr)
     if args.optimizer == "RMSprop":
-        optimizer = torch.optim.RMSprop(model.parameters(), lr = args.lr)
+        optimizer = torch.optim.RMSprop(train_model.parameters(), lr = args.lr)
 
     # [start the training process recording]
     itrs = 0
@@ -226,7 +226,7 @@ def train_Archerus(model, config, args):
             # [perception module training]
             gt_ims = torch.tensor(sample["image"].numpy()).float().to(config.device)
 
-            outputs = model.scene_perception(gt_ims)
+            outputs = train_model.scene_perception(gt_ims)
             recons, clusters, all_losses = outputs["recons"],outputs["clusters"],outputs["losses"]
       
             perception_loss = 0
@@ -262,9 +262,9 @@ def train_Archerus(model, config, args):
                         kwargs = {"features":features,
                                   "end":scores }
 
-                        q = model.executor.parse(program)
+                        q = train_model.executor.parse(program)
                         
-                        o = model.executor(q, **kwargs)
+                        o = train_model.executor(q, **kwargs)
                         #print("Batch:{}".format(b),q,o["end"],answer)
                         if answer in numbers and len(q)>2:
                             int_num = torch.tensor(numbers.index(answer)).float().to(config.device)
@@ -291,7 +291,7 @@ def train_Archerus(model, config, args):
             if not(itrs % args.checkpoint_itrs):
                 name = args.name
                 expr = args.training_mode
-                torch.save(model, "checkpoints/{}_{}_{}_{}.ckpt".format(name,expr,config.domain,config.perception))
+                torch.save(train_model, "checkpoints/{}_{}_{}_{}.ckpt".format(name,expr,config.domain,config.perception))
                 log_imgs(config.imsize,pred_img.cpu().detach(), clusters, gt_ims.reshape([args.batch_size,config.imsize ** 2,3]).cpu().detach(),writer,itrs)
                 
                 visualize_image_grid(gt_ims.flatten(start_dim = 0, end_dim = 1).cpu().detach(), row = args.batch_size, save_name = "ptr_gt_perception")
@@ -504,7 +504,7 @@ else:
     if args.name == "TBC":
         config.perception = "slot_attention"
         model = SceneLearner(config)
-    elif args.name == "Archerus":
+    elif args.name == "Acherus":
         config.perception = "psgnet"
         model = SceneLearner(config)
 

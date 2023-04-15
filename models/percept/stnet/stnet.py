@@ -466,7 +466,7 @@ class FeatureDecoder(nn.Module):
 class SceneGraphLevel(nn.Module):
     def __init__(self, config):
         super().__init__()
-        self.layer_embedding = nn.Embedding(10)
+        self.layer_embedding = nn.Embedding(10, 100)
 
     def aggregate_features(self,inputs):
         return {"features":0,"scores":0}
