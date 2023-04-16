@@ -93,7 +93,7 @@ def optical_flow_motion_mask(video):
     return masks
 
 class PSGNet(torch.nn.Module):
-    def __init__(self,imsize, perception_size, struct = [1, 1]):
+    def __init__(self,imsize, perception_size, node_feat_size, struct = [1, 1]):
 
         super().__init__()
         device = "cuda:0" if torch.cuda.is_available() else "cpu"
@@ -365,7 +365,7 @@ class AbstractNet(nn.Module):
         match = torch.softmax(masks.unsqueeze(-1) * torch.einsum("bnc,bmc -> bnm",component_features, proposal_features)/math.sqrt(0.1), dim = -1)
     
 
-        output_features = self.transfer(torch.einsum("bnc,bnm->bmc",features, match))
+        output_features = torch.einsum("bnc,bnm->bmc",features, match)
         #print(torch.sum(match,-2))
 
         existence = torch.max(match, dim = 1).values
@@ -469,13 +469,13 @@ class SceneGraphLevel(nn.Module):
     def __init__(self, config):
         super().__init__()
         num_slots = 10
-        in_dim = 2 + 128
+        in_dim = config.object_dim
         self.layer_embedding = nn.Parameter(torch.randn(10, in_dim))
         self.constuct_quarter = SlotAttention(num_slots,in_dim = in_dim,slot_dim = in_dim, iters = 5)
 
     def forward(self,inputs):
-        in_scores = inputs["features"]
-        in_features = inputs["scores"]
+        in_features = inputs["features"]
+        in_scores = inputs["scores"]
         B = in_scores.shape[0]
 
         if False:
@@ -483,24 +483,25 @@ class SceneGraphLevel(nn.Module):
             # [B,N,C]
         else:
             construct_features, construct_attn = in_features, in_scores
-
+        
         proposal_features = self.layer_embedding.unsqueeze(0).repeat(B,1,1)
 
-        match = torch.softmax(in_scores.unsqueeze(-1) * torch.einsum("bnc,bmc -> bnm",in_features, proposal_features)/math.sqrt(0.1), dim = -1)
+        match = torch.softmax(in_scores * torch.einsum("bnc,bmc -> bnm",in_features, proposal_features)/math.sqrt(0.1), dim = -1)
 
-        out_features = self.transfer(torch.einsum("bnc,bnm->bmc",construct_features, match))
+        out_features = torch.einsum("bnc,bnm->bmc",construct_features, match)
 
 
-        out_scores = torch.max(match).values
-  
-
+        out_scores = torch.max(match, dim = 1).values
+        
+        #print(out_scores)
+        #print(out_scores.shape)
 
         return {"features":out_features,"scores":out_scores}
 
 class SceneGraphNet(nn.Module):
     def __init__(self, config):
         super().__init__()
-        self.backbone = PSGNet(imsize = config.imsize, perception_size = config.perception_size)
+        self.backbone = PSGNet(config.imsize, config.perception_size, config.object_dim - 2)
         self.scene_graph_levels = nn.ModuleList([
             SceneGraphLevel(config)
         ])
@@ -508,7 +509,7 @@ class SceneGraphNet(nn.Module):
     def forward(self, ims):
         primary_scene = self.backbone(ims)
 
-        psg_features = to_dense_features(primary_scene)
+        psg_features = to_dense_features(primary_scene)[-1]
 
         base_features = torch.cat([
             psg_features["features"],
@@ -534,7 +535,7 @@ class SceneGraphNet(nn.Module):
 class SceneTreeNet(nn.Module):
     def __init__(self, config):
         super().__init__()
-        self.backbone = PSGNet(imsize = config.imsize, perception_size = config.perception_size)
+        self.backbone = PSGNet(config.imsize, config.object_dim - 2, perception_size = config.perception_size)
 
         self.abstract_layers = nn.ModuleList([
             AbstractNet(64, 10)

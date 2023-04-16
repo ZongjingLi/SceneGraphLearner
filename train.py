@@ -235,12 +235,11 @@ def train_Archerus(train_model, config, args):
             for i,pred_img in enumerate(recons[:]):
 
                 perception_loss += torch.nn.functional.l1_loss(pred_img.flatten(), gt_ims.flatten())
-            
 
             # [language query module training]
             language_loss = 0
             if query:
-                for question in np.random.shuffle(sample["question"]):
+                for question in sample["question"]:
                     for b in range(len(question["program"])):
                         program = question["program"][b] # string program
                         answer  = question["answer"][b]  # string answer
@@ -250,7 +249,7 @@ def train_Archerus(train_model, config, args):
 
                         working_scene = [top_level_scene]
 
-                        scores   = top_level_scene["masks"][b,...] - EPS
+                        scores   = top_level_scene["scores"][b,...] - EPS
 
                         features = top_level_scene["features"][b]
 
@@ -262,17 +261,22 @@ def train_Archerus(train_model, config, args):
                         kwargs = {"features":features,
                                   "end":scores }
 
+                        print(scores)
                         q = train_model.executor.parse(program)
                         
                         o = train_model.executor(q, **kwargs)
                         #print("Batch:{}".format(b),q,o["end"],answer)
                         if answer in numbers and len(q)>2:
                             int_num = torch.tensor(numbers.index(answer)).float().to(config.device)
+
+                            print(F.mse_loss(int_num + 1,o["end"]))
+
                             language_loss += F.mse_loss(int_num + 1,o["end"])
+
                         if answer in yes_or_no:
                             if answer == "yes":language_loss -= F.logsigmoid(o["end"])
                             else:language_loss -= torch.log(1 - torch.sigmoid(o["end"]))
-
+                            print(F.logsigmoid(o["end"]))
             # [calculate the working loss]
             working_loss = perception_loss * alpha + language_loss * beta
 
