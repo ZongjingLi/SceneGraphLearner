@@ -16,43 +16,6 @@ import torchvision
 from skimage import color
 
 
-class PTRImageDataColab(Dataset):
-    def __init__(self,split="train",resolution = (128,128)):
-        super().__init__()
-        assert split in ["train","test","val"]
-        self.split = split
-        self.root_dir = "/Users/melkor/Documents/datasets/ptr_data/PTR"
-        self.root_dir = ""
-        self.img_transform = transforms.Compose(
-            [transforms.ToTensor()]
-        )
-
-        self.resolution = resolution
-        self.file_names = os.listdir("/content/{}_images/{}_images/".format(split,split))
-
-        if split == "train": # 518110
-            pass
-            #self.ptr_data = load_json("/Users/melkor/Documents/datasets/ptr_data/PTR/train_questions.json")["questions"]
-        elif split == "val":
-            pass
-            #self.ptr_data = load_json("/Users/melkor/Documents/datasets/ptr_data/PTR/val_questions.json")["questions"]
-    def __getitem__(self,index): # 91720
-        #data_bind = self.ptr_data[index]
-        #idx = ("000000" + str(index))[-6:]
-        image_file_name = os.path.join(self.root_dir,"{}_images".format(self.split),"{}_images".format(self.split),self.file_names[index])
-        #question = data_bind['question']
-        #program = data_bind["program"]
-        #answer = data_bind["answer"]
-        image = Image.open(image_file_name).convert()
-        image = image.convert("RGB").resize(self.resolution) 
-        image = self.img_transform(image).permute([1,2,0]) 
-        #return torch.tensor(np.array(image)).float()/256
-        return {"image":image}#"question":question,"answer":answer,"program":program}
-
-    def __len__(self):
-        return len(self.file_names)
-
-
 def freeze_parameters(model):
     for param in model.parameters():
         param.requires_grad = False
@@ -218,7 +181,11 @@ def train(model, config, args):
 
 def train_TBC(model, config, args):
     name = args.name
-    dataset = PTRImageDataColab("train")
+    if config.domain == "ptr":
+        dataset = None
+    if config.domain == "toy":
+        dataset = ToyDataWithQuestions("train")
+
     if args.training_mode == "joint":
         try:
             print("object score allowed")
@@ -373,10 +340,10 @@ argparser = argparse.ArgumentParser()
 # [general config of the training]
 argparser.add_argument("--device",                  default = config.device)
 argparser.add_argument("--name",                    default = "KFT")
-argparser.add_argument("--epoch",                   default = 1000)
+argparser.add_argument("--epoch",                   default = 100)
 argparser.add_argument("--optimizer",               default = "Adam")
 argparser.add_argument("--lr",                      default = 2e-4)
-argparser.add_argument("--batch_size",              default = 2)
+argparser.add_argument("--batch_size",              default = 4)
 argparser.add_argument("--dataset",                 default = "toy")
 
 # [perception and language grounding training]
@@ -386,7 +353,7 @@ argparser.add_argument("--beta",                    default = 0.001)
 
 # [additional training details]
 argparser.add_argument("--warmup",                  default = True)
-argparser.add_argument("--warmup_steps",            default = 3000)
+argparser.add_argument("--warmup_steps",            default = 100)
 argparser.add_argument("--decay",                   default = False)
 argparser.add_argument("--decay_steps",             default = 20000)
 argparser.add_argument("--decay_rate",              default = 0.99)
@@ -397,7 +364,7 @@ argparser.add_argument("--effective_level",         default = 1)
 
 # [checkpoint location and savings]
 argparser.add_argument("--checkpoint_dir",          default = False)
-argparser.add_argument("--checkpoint_itrs",         default = 500)
+argparser.add_argument("--checkpoint_itrs",         default = 10)
 argparser.add_argument("--pretrain_perception",     default = False)
 
 args = argparser.parse_args()
@@ -413,13 +380,11 @@ else:
         model = SceneLearner(config)
 
 if args.pretrain_perception:
-  pass    
-model.scene_perception = torch.load("/content/checkpoints/PTRObjects_toy_slot_attention.ckpt", map_location=args.device)
+    model.scene_perception = torch.load(args.pretrain_perception, map_location = config.device)
 
-model.scene_perception.slot_attention.iters = 7
-model = model.to(config.device)
+model = torch.load("checkpoints/TBC_joint_toy_slot_attention.ckpt", map_location=args.device)
+model.scene_perception.slot_attention.iters = 10
 
-train_TBC(model, config, args)
 if args.name == "TBC":
     train_TBC(model, config, args)
 else:
