@@ -197,7 +197,7 @@ class FeatureDecoder(nn.Module):
     def forward(self, z):
         # z (bs, 32)
         bs,_ = z.shape
-       
+
         z = z.view(z.shape + (1, 1))
 
         # Tile across to match image size
@@ -209,17 +209,18 @@ class FeatureDecoder(nn.Module):
         x = torch.cat((self.x_grid.expand(bs, -1, -1, -1),
                        self.y_grid.expand(bs, -1, -1, -1), z), dim=1)
         # x (bs, 32, image_h, image_w)
+
         x = self.conv1(x);x = self.celu(x) * 1.0
-        x = torch.clamp(x, min = -100, max = 100)
+        x = torch.clamp(x, min = -32000, max = 32000)
         # x = self.bn1(x)
         x = self.conv2(x);x = self.celu(x) * 1.0#self.celu(x)
-        x = torch.clamp(x, min = -100, max = 100)
+        x = torch.clamp(x, min = -32000, max = 32000)
         # x = self.bn2(x)
         x = self.conv3(x);x = self.celu(x) * 1.0
-        x = torch.clamp(x, min = -100, max = 100)
+        x = torch.clamp(x, min = -32000, max = 32000)
         # x = self.bn3(x)
         x = self.conv4(x);x = self.celu(x) * 1.0
-        x = torch.clamp(x, min = -100, max = 100)
+        x = torch.clamp(x, min = -32000, max = 32000)
         #x = self.bn4(x)
 
         img = self.conv5_img(x)
@@ -271,9 +272,9 @@ class SlotAttentionParser(nn.Module):
         self.num_slots = num_slots # the number of objects and backgrounds in the scene
         self.object_dim = object_dim # the dimension of object level after the projection
 
-        self.encoder_net = FeatureMapEncoder(input_nc = 3,z_dim = 72)
-        self.slot_attention = SlotAttention(num_slots,72,72,num_iters)
-        self.decoder_net = FeatureDecoder(72,3,object_dim)
+        self.encoder_net = FeatureMapEncoder(input_nc = 3,z_dim = 256)
+        self.slot_attention = SlotAttention(num_slots,256,256,num_iters)
+        self.decoder_net = FeatureDecoder(256,3,object_dim)
         self.use_obj_score = False
 
         
@@ -311,9 +312,9 @@ class SlotAttentionParser(nn.Module):
         # slot attention: generate slot proposals based on the feature net
         slots,attn  = self.slot_attention(feature_inp) 
         # slots: [b,K,C] attn: [b,N,C]
-
+  
         # decoder model: make reconstructions and masks based on the 
-        img, logitmasks, object_features, object_scores= self.decoder_net(slots.view([-1,72]))
+        img, logitmasks, object_features, object_scores= self.decoder_net(slots.view([-1,256]))
         
         object_features = object_features.view([b,self.num_slots,-1])
         object_scores   = object_scores.view([b,self.num_slots,1])

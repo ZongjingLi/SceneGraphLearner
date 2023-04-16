@@ -10,6 +10,7 @@ from torch_geometric.nn    import max_pool_x, GraphConv
 from torch_geometric.data  import Data,Batch
 from torch_geometric.utils import grid, to_dense_batch
 from torch_scatter import scatter_mean,scatter_max
+from models.percept.slot_attention import SlotAttention
 
 from models.percept.stnet.propagation import GraphPropagation
 
@@ -463,13 +464,38 @@ class FeatureDecoder(nn.Module):
         return img, logitmask, object_features,object_scores
 
 
+
 class SceneGraphLevel(nn.Module):
     def __init__(self, config):
         super().__init__()
-        self.layer_embedding = nn.Embedding(10, 100)
+        num_slots = 10
+        in_dim = 2 + 128
+        self.layer_embedding = nn.Parameter(torch.randn(10, in_dim))
+        self.constuct_quarter = SlotAttention(num_slots,in_dim = in_dim,slot_dim = in_dim, iters = 5)
 
-    def aggregate_features(self,inputs):
-        return {"features":0,"scores":0}
+    def forward(self,inputs):
+        in_scores = inputs["features"]
+        in_features = inputs["scores"]
+        B = in_scores.shape[0]
+
+        if False:
+            construct_features, construct_attn = self.connstruct_quarter(in_features)
+            # [B,N,C]
+        else:
+            construct_features, construct_attn = in_features, in_scores
+
+        proposal_features = self.layer_embedding.unsqueeze(0).repeat(B,1,1)
+
+        match = torch.softmax(in_scores.unsqueeze(-1) * torch.einsum("bnc,bmc -> bnm",in_features, proposal_features)/math.sqrt(0.1), dim = -1)
+
+        out_features = self.transfer(torch.einsum("bnc,bnm->bmc",construct_features, match))
+
+
+        out_scores = torch.max(match).values
+  
+
+
+        return {"features":out_features,"scores":out_scores}
 
 class SceneGraphNet(nn.Module):
     def __init__(self, config):
@@ -484,7 +510,21 @@ class SceneGraphNet(nn.Module):
 
         psg_features = to_dense_features(primary_scene)
 
-        abstract_scene = {}
+        base_features = torch.cat([
+            psg_features["features"],
+            psg_features["centroids"],
+        ],dim = -1)
+        B = psg_features["features"].shape[0]
+        P = psg_features["features"].shape[1]
+
+        base_scene = {"scores":torch.ones(B,P,1),"features":base_features}
+        abstract_scene = [base_scene]
+
+        # [Construct the Scene Level]
+        for merger in self.scene_graph_levels:
+            construct_scene = merger(abstract_scene[-1])
+            abstract_scene.append(construct_scene)
+
         primary_scene["abstract_scene"] = abstract_scene
 
         return primary_scene
