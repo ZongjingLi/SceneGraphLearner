@@ -221,6 +221,7 @@ def train_Archerus(train_model, config, args):
     writer = SummaryWriter(events_dir)
 
     for epoch in range(args.epoch):
+        epoch_loss = 0
         for sample in dataloader:
             
             # [perception module training]
@@ -282,6 +283,7 @@ def train_Archerus(train_model, config, args):
                                 answer_distribution_binary(F.sigmoid(o["end"]).cpu().detach().numpy())
             # [calculate the working loss]
             working_loss = perception_loss * alpha + language_loss * beta
+            epoch_loss += working_loss.detach().numpy()
 
             # [backprop and optimize parameters]
             optimizer.zero_grad()
@@ -309,7 +311,7 @@ def train_Archerus(train_model, config, args):
             itrs += 1
 
             sys.stdout.write ("\rEpoch: {}, Itrs: {} Loss: {} Percept:{} Language:{}, Time: {}".format(epoch + 1, itrs, working_loss,perception_loss,language_loss,datetime.timedelta(seconds=time.time() - start)))
-    
+        writer.add_scalar("epoch_loss", epoch_loss, epoch)
     print("\n\nExperiment {} : Training Completed.".format(args.name))
 
 
