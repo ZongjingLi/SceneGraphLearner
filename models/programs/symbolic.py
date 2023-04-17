@@ -105,6 +105,8 @@ class Scene(SymbolicProgram):
         scene_tree= executor.kwargs["features"]
 
         logit = torch.log(score / (1 - score))
+
+
         return {"end":logit}
 
 class Unique(SymbolicProgram):

@@ -10,6 +10,7 @@ from torch_geometric.nn    import max_pool_x, GraphConv
 from torch_geometric.data  import Data,Batch
 from torch_geometric.utils import grid, to_dense_batch
 from torch_scatter import scatter_mean,scatter_max
+from models.nn import primary
 from models.percept.slot_attention import SlotAttention
 
 from models.percept.stnet.propagation import GraphPropagation
@@ -483,16 +484,15 @@ class SceneGraphLevel(nn.Module):
             # [B,N,C]
         else:
             construct_features, construct_attn = in_features, in_scores
-        
+
         proposal_features = self.layer_embedding.unsqueeze(0).repeat(B,1,1)
 
         match = torch.softmax(in_scores * torch.einsum("bnc,bmc -> bnm",in_features, proposal_features)/math.sqrt(0.1), dim = -1)
 
         out_features = torch.einsum("bnc,bnm->bmc",construct_features, match)
 
-
         out_scores = torch.max(match, dim = 1).values
-        
+
         #print(out_scores)
         #print(out_scores.shape)
 
@@ -507,6 +507,7 @@ class SceneGraphNet(nn.Module):
         ])
 
     def forward(self, ims):
+
         primary_scene = self.backbone(ims)
 
         psg_features = to_dense_features(primary_scene)[-1]

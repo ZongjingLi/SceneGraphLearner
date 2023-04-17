@@ -226,18 +226,20 @@ def train_Archerus(train_model, config, args):
             # [perception module training]
             gt_ims = torch.tensor(sample["image"].numpy()).float().to(config.device)
 
-            outputs = train_model.scene_perception(gt_ims)
+            outputs = model.scene_perception(gt_ims)
+
+            # get the components
             recons, clusters, all_losses = outputs["recons"],outputs["clusters"],outputs["losses"]
-      
+
             perception_loss = 0
 
 
             for i,pred_img in enumerate(recons[:]):
-
                 perception_loss += torch.nn.functional.l1_loss(pred_img.flatten(), gt_ims.flatten())
 
             # [language query module training]
             language_loss = 0
+
             if query:
                 for question in sample["question"]:
                     for b in range(len(question["program"])):
@@ -250,6 +252,7 @@ def train_Archerus(train_model, config, args):
                         working_scene = [top_level_scene]
 
                         scores   = top_level_scene["scores"][b,...] - EPS
+                        scores   = torch.clamp(scores, min = EPS, max = 1)
 
                         features = top_level_scene["features"][b]
 
@@ -261,22 +264,22 @@ def train_Archerus(train_model, config, args):
                         kwargs = {"features":features,
                                   "end":scores }
 
-                        print(scores)
                         q = train_model.executor.parse(program)
                         
                         o = train_model.executor(q, **kwargs)
                         #print("Batch:{}".format(b),q,o["end"],answer)
-                        if answer in numbers and len(q)>2:
-                            int_num = torch.tensor(numbers.index(answer)).float().to(config.device)
-
-                            print(F.mse_loss(int_num + 1,o["end"]))
-
+                        if answer in numbers:
+                            int_num = torch.tensor(numbers.index(answer)).float().to(args.device)
                             language_loss += F.mse_loss(int_num + 1,o["end"])
-
+                            if itrs % args.checkpoint_itrs == 0:
+                                print(q,answer)
+                                answer_distribution_num(o["end"].cpu().detach().numpy(),1+int_num.cpu().detach().numpy())
                         if answer in yes_or_no:
                             if answer == "yes":language_loss -= F.logsigmoid(o["end"])
                             else:language_loss -= torch.log(1 - torch.sigmoid(o["end"]))
-                            print(F.logsigmoid(o["end"]))
+                            if itrs % args.checkpoint_itrs == 0:
+                                print(q,answer)
+                                answer_distribution_binary(F.sigmoid(o["end"]).cpu().detach().numpy())
             # [calculate the working loss]
             working_loss = perception_loss * alpha + language_loss * beta
 
@@ -360,6 +363,7 @@ def train_TBC(model, config, args):
             if True or args.training_mode == "perception" or args.training_mode == "joint":
                 inputs = sample["image"].to(args.device)
                 gt_ims = inputs
+
                 try:outputs = model.scene_perception(inputs)
                 except:outputs = model(inputs)
 
@@ -379,7 +383,9 @@ def train_TBC(model, config, args):
                         program = question["program"][b] # string program
                         answer  = question["answer"][b]  # string answer
 
-                        scores   = outputs["object_scores"][b,...,0] - EPS
+                        scores   = torch.clamp(outputs["object_scores"][b,...,0] - EPS, min=-1,max=1)
+                        
+            
                         features = outputs["object_features"][b]
 
                         edge = 1e-6
@@ -522,5 +528,6 @@ if args.name == "TBC":
     train_TBC(model, config, args)
 elif args.name == "Acherus":
     print("Assault on New Avalon")
+    config.perception = "psgnet"
     train_Archerus(model, config, args)
 

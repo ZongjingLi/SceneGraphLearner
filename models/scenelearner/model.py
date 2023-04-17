@@ -30,9 +30,9 @@ class SceneLearner(nn.Module):
 
     def parse(self, program):return self.executor.parse(program)
     
-    def forward(self, inputs):
+    def forward(self, inputs, query = None):
 
         # [Parse the Input Scenes]
-        scene_tree_output = self.scene_perception(inputs["image"])
+        scene_tree_output = self.scene_perception(inputs)
 
         # get the components
