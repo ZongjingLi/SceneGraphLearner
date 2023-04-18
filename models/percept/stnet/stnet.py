@@ -493,10 +493,12 @@ class SceneGraphLevel(nn.Module):
 
         out_scores = torch.max(match, dim = 1).values
 
-        #print(out_scores)
-        #print(out_scores.shape)
+        in_masks = inputs["masks"]
+        out_masks = torch.einsum("bwhm,bmn->bwhn",in_masks,match)
 
-        return {"features":out_features,"scores":out_scores}
+
+
+        return {"features":out_features,"scores":out_scores, "masks":out_masks}
 
 class SceneGraphNet(nn.Module):
     def __init__(self, config):
@@ -507,9 +509,9 @@ class SceneGraphNet(nn.Module):
         ])
 
     def forward(self, ims):
-
+        # [PSGNet as the Backbone]
+        B,W,H,C = ims.shape
         primary_scene = self.backbone(ims)
-
         psg_features = to_dense_features(primary_scene)[-1]
 
         base_features = torch.cat([
@@ -519,7 +521,31 @@ class SceneGraphNet(nn.Module):
         B = psg_features["features"].shape[0]
         P = psg_features["features"].shape[1]
 
-        base_scene = {"scores":torch.ones(B,P,1),"features":base_features}
+        # [Compute the Base Mask]
+        clusters = primary_scene["clusters"]
+
+        local_masks = []
+        for i in range(len(clusters)):
+            cluster_r = clusters[i][0];
+            for cluster_j,batch_j in reversed(clusters[:i]):
+                cluster_r = cluster_r[cluster_j].unsqueeze(0).reshape([B,W,H])
+
+                local_masks.append(cluster_r)
+
+        K = int(cluster_r.max()) + 1 # Cluster size
+        local_masks = torch.zeros([B,W,H,K])
+        
+        for k in range(K):
+            #local_masks[cluster_r] = 1
+            local_masks[:,:,:,k] = torch.where(k == cluster_r,1,0)
+        #print(K)
+        #print(cluster_r.shape)
+        #local_masks = local_masks.reshape([B,W,H,K])
+
+        #print(torch.sum(local_masks, dim = -1))
+
+        # [Construct the Base Level]
+        base_scene = {"scores":torch.ones(B,P,1),"features":base_features,"masks":local_masks}
         abstract_scene = [base_scene]
 
         # [Construct the Scene Level]

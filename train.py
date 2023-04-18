@@ -231,6 +231,11 @@ def train_Archerus(train_model, config, args):
 
             # get the components
             recons, clusters, all_losses = outputs["recons"],outputs["clusters"],outputs["losses"]
+            
+            masks    = outputs["abstract_scene"][-1]["masks"].permute([0,3,1,2]).unsqueeze(-1)
+            scores   = outputs["abstract_scene"][-1]["scores"][0,...] - EPS
+            scores   = torch.clamp(scores, min = EPS, max = 1)
+            print(scores)
 
             perception_loss = 0
 
@@ -300,12 +305,16 @@ def train_Archerus(train_model, config, args):
             if not(itrs % args.checkpoint_itrs):
                 name = args.name
                 expr = args.training_mode
+                num_slots = masks.shape[1]
                 torch.save(train_model, "checkpoints/{}_{}_{}_{}.ckpt".format(name,expr,config.domain,config.perception))
                 log_imgs(config.imsize,pred_img.cpu().detach(), clusters, gt_ims.reshape([args.batch_size,config.imsize ** 2,3]).cpu().detach(),writer,itrs)
                 
                 visualize_image_grid(gt_ims.flatten(start_dim = 0, end_dim = 1).cpu().detach(), row = args.batch_size, save_name = "ptr_gt_perception")
                 visualize_image_grid(gt_ims[0].cpu().detach(), row = 1, save_name = "val_gt_image")
 
+                
+                single_comps =  torchvision.utils.make_grid(masks[0:1].cpu().detach().permute([0,1,4,2,3]).flatten(start_dim = 0, end_dim = 1),normalize=True,nrow=num_slots).permute(1,2,0)
+                visualize_image_grid(single_comps.cpu().detach(), row = 1, save_name = "slot_masks")
                 #visualize_psg(gt_ims[0:1].cpu().detach(), outputs["abstract_scene"], args.effective_level)
 
             itrs += 1
@@ -389,6 +398,7 @@ def train_TBC(model, config, args):
                         
             
                         features = outputs["object_features"][b]
+
 
                         edge = 1e-6
                         if config.concept_type == "box":
