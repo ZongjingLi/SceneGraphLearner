@@ -191,7 +191,8 @@ def train_Archerus(train_model, config, args):
             train_dataset = ToyDataWithQuestions("train", resolution = config.resolution)
         else:
             train_dataset = ToyData("train", resolution = config.resolution)
-
+    if args.dataset == "Elbon":
+        train_dataset = AcherusImageDataset("train")
     if args.training_mode == "query":
         freeze_parameters(train_model.scene_perception.backbone)
 
@@ -540,6 +541,11 @@ if args.name == "TBC":
     train_TBC(model, config, args)
 elif args.name == "Acherus":
     print("Assault on New Avalon")
+    config.perception = "psgnet"
+    train_Archerus(model, config, args)
+elif args.name == "Elbon":
+    print("The Elbon Blade")
+    args.dataset_name = "Acherus"
     config.perception = "psgnet"
     train_Archerus(model, config, args)
 

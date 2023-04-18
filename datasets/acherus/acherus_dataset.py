@@ -13,15 +13,17 @@ from torchvision import transforms
 from PIL import Image
 from utils import *
 
-class MineClip(Dataset):
+class AcherusImageDataset(Dataset):
     def __init__(self,split = "train",path = "",resolution = (480,360)):
         super().__init__()
         self.resolution = resolution
-        self.path = "data/minevs/{}.jpg"
+        self.path = "/Users/melkor/Documents/datasets/acherus/train/{}.jpg"
         #self.images = sorted(glob(self.path))
         self.img_transform = transforms.Compose(
             [transforms.ToTensor()]
         )
+        self.file_names = os.listdir("/Users/melkor/Documents/datasets/acherus/{}/".format(split,split))
+
 
     def __len__(self):
         return 10
@@ -32,3 +34,4 @@ class MineClip(Dataset):
         image = self.img_transform(image)
         sample = {"image":image}
         return sample
+

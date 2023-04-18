@@ -44,40 +44,18 @@ def right_click():pyautogui.rightClick()
 import numpy as np
 from PIL import ImageGrab
 
-class Ainulindale:
-    def __init__(self):
-        super().__init__()
-        self.short_term_buffer = []
-        self.action_space = None
-
-    def reset(self):pass
-
-    def observe(self):pass
-
-    def step(self,action):
-        #pyautogui.screenshot("{}.jpg".format(i))
-        screen = np.array(ImageGrab.grab(bbox=(0,0,800,600)))
-        if action["name"] == "no_nothing":
-            pass
-        if action["name"] == "right_click":right_click()
-        if action["name"] == "left_click":left_click()
-        outputs = {
-            "screen":screen
-        }
-        return outputs
 
 import matplotlib.pyplot as plt
 
 
-if __name__ == "__main__":
-    env = Ainulindale()
-    for i in range(20):
+if __name__ == "__main":
+    for i in range(200):
         off_set = 60
         curr = time.time()
         #pyautogui.screenshot("{}.jpg".format(i))
         screen = np.array(ImageGrab.grab(bbox=(20,10+off_set,844,484+off_set)))
         #plt.imshow(screen)
-        plt.imsave("data/Acherus/{}.jpg".format(30 + i),screen)
+        plt.imsave("/Users/melkor/Documents/datasets/acherus/train/{}.jpg".format(0 + i),screen)
         now  = time.time()
         print(i,now - curr)
         #pyautogui.press("w",100)
