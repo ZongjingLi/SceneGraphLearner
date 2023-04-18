@@ -469,9 +469,9 @@ class FeatureDecoder(nn.Module):
 class SceneGraphLevel(nn.Module):
     def __init__(self, config):
         super().__init__()
-        num_slots = 10
+        num_slots = 3
         in_dim = config.object_dim
-        self.layer_embedding = nn.Parameter(torch.randn(10, in_dim))
+        self.layer_embedding = nn.Parameter(torch.randn(num_slots, in_dim))
         self.constuct_quarter = SlotAttention(num_slots,in_dim = in_dim,slot_dim = in_dim, iters = 5)
 
     def forward(self,inputs):

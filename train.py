@@ -236,7 +236,7 @@ def train_Archerus(train_model, config, args):
             masks    = outputs["abstract_scene"][-1]["masks"].permute([0,3,1,2]).unsqueeze(-1)
             scores   = outputs["abstract_scene"][-1]["scores"][0,...] - EPS
             scores   = torch.clamp(scores, min = EPS, max = 1)
-            print(scores)
+            #print(scores)
 
             perception_loss = 0
 
@@ -529,6 +529,10 @@ else:
         model = SceneLearner(config)
     elif args.name == "Acherus":
         config.perception = "psgnet"
+        model = SceneLearner(config)
+    elif args.name == "Elbon":
+        config.perception = "psgnet"
+        args.dataset = "Elbon"
         model = SceneLearner(config)
 
 if args.pretrain_perception:

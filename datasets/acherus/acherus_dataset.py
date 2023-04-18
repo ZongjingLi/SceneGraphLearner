@@ -14,7 +14,7 @@ from PIL import Image
 from utils import *
 
 class AcherusImageDataset(Dataset):
-    def __init__(self,split = "train",path = "",resolution = (480,360)):
+    def __init__(self,split = "train",path = "",resolution = (128,128)):
         super().__init__()
         self.resolution = resolution
         self.path = "/Users/melkor/Documents/datasets/acherus/train/{}.jpg"
@@ -26,12 +26,12 @@ class AcherusImageDataset(Dataset):
 
 
     def __len__(self):
-        return 10
+        return 130
 
     def __getitem__(self, index):
         image = Image.open(self.path.format(index))
         image = image.convert("RGB").resize(self.resolution)
         image = self.img_transform(image)
-        sample = {"image":image}
+        sample = {"image":image.permute(1,2,0)}
         return sample
 
