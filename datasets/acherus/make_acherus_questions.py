@@ -13,13 +13,31 @@ for i in range(130):
     questions_answer_pairs = []
     if i <= 83:
         answer = "yes"
+        count = "one"
+        count_obj = "1"
     else:
         answer = "no"
+        count = "zero"
+        count_obj = "zero"
     questions_answer_pairs.append(
                 {
             "question":"is there any house in the scene",
             "program":"exist(filter(scene(),house))",
             "answer":answer
+                }
+            )
+    questions_answer_pairs.append(
+                {
+            "question":"how many house in the scene",
+            "program":"count(filter(scene(),house))",
+            "answer":count
+                }
+            )
+    questions_answer_pairs.append(
+                {
+            "question":"how many object in the scene",
+            "program":"count(scene())",
+            "answer":count_obj
                 }
             )
     all_questions.append(questions_answer_pairs)

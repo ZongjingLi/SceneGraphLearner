@@ -282,19 +282,22 @@ def train_Archerus(train_model, config, args):
                         
                         o = train_model.executor(q, **kwargs)
                         #print("Batch:{}".format(b),q,o["end"],answer)
+                        
                         if answer in numbers:
                             int_num = torch.tensor(numbers.index(answer)).float().to(args.device)
                             language_loss += F.mse_loss(int_num + 1,o["end"])
                             if itrs % args.checkpoint_itrs == 0:
                                 print(q,answer)
+                                visualize_scores(scores.reshape([args.batch_size,-1,1]).detach())
                                 answer_distribution_num(o["end"].cpu().detach().numpy(),1+int_num.cpu().detach().numpy())
                         if answer in yes_or_no:
-                            if answer == "yes":language_loss -= F.logsigmoid(o["end"])
+                            if answer == "yes":language_loss -= torch.log(torch.sigmoid(o["end"]))
                             else:language_loss -= torch.log(1 - torch.sigmoid(o["end"]))
                             if itrs % args.checkpoint_itrs == 0:
                                 print(q,answer)
-                                print(F.sigmoid(o["end"]).cpu().detach().numpy())
-                                answer_distribution_binary(F.sigmoid(o["end"]).cpu().detach().numpy())
+                                print(torch.sigmoid(o["end"]).cpu().detach().numpy())
+                                visualize_scores(scores.reshape([args.batch_size,-1,1]).detach())
+                                answer_distribution_binary(torch.sigmoid(o["end"]).cpu().detach().numpy())
             # [calculate the working loss]
             working_loss = perception_loss * alpha + language_loss * beta
             epoch_loss += working_loss.detach().numpy()
@@ -336,7 +339,7 @@ argparser = argparse.ArgumentParser()
 # [general config of the training]
 argparser.add_argument("--device",                  default = config.device)
 argparser.add_argument("--name",                    default = "KFT")
-argparser.add_argument("--epoch",                   default = 100)
+argparser.add_argument("--epoch",                   default = 400)
 argparser.add_argument("--optimizer",               default = "Adam")
 argparser.add_argument("--lr",                      default = 2e-4)
 argparser.add_argument("--batch_size",              default = 1)

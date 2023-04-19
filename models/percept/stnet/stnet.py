@@ -473,6 +473,8 @@ class SceneGraphLevel(nn.Module):
         in_dim = config.object_dim
         self.layer_embedding = nn.Parameter(torch.randn(num_slots, in_dim))
         self.constuct_quarter = SlotAttention(num_slots,in_dim = in_dim,slot_dim = in_dim, iters = 5)
+        self.hermit = nn.Linear(config.object_dim,in_dim)
+        self.outward = nn.Linear(in_dim,in_dim)
 
     def forward(self,inputs):
         in_features = inputs["features"]
@@ -485,11 +487,14 @@ class SceneGraphLevel(nn.Module):
         else:
             construct_features, construct_attn = in_features, in_scores
 
+        construct_features = self.hermit(construct_features)
+
         proposal_features = self.layer_embedding.unsqueeze(0).repeat(B,1,1)
 
         match = torch.softmax(in_scores * torch.einsum("bnc,bmc -> bnm",in_features, proposal_features)/math.sqrt(0.1), dim = -1)
 
         out_features = torch.einsum("bnc,bnm->bmc",construct_features, match)
+        out_features = self.outward(out_features)
 
         out_scores = torch.max(match, dim = 1).values.unsqueeze(-1)
 
@@ -505,7 +510,7 @@ class SceneGraphNet(nn.Module):
         super().__init__()
         self.backbone = PSGNet(config.imsize, config.perception_size, config.object_dim - 2)
         self.scene_graph_levels = nn.ModuleList([
-            SceneGraphLevel(10, config),
+            SceneGraphLevel(5, config),
             #SceneGraphLevel(4, config)
         ])
 
