@@ -1,4 +1,6 @@
-from multiprocessing.connection import answer_challenge
+import warnings
+warnings.filterwarnings("ignore")
+
 import torch
 import argparse 
 import datetime
@@ -303,13 +305,14 @@ def train_Archerus(train_model, config, args):
             epoch_loss += working_loss.detach().numpy()
 
             # [backprop and optimize parameters]
+            for i,losses in enumerate(all_losses):
+                for loss_name,loss in losses.items():
+                    writer.add_scalar(str(i)+loss_name, loss, itrs)
+
             optimizer.zero_grad()
             working_loss.backward()
             optimizer.step()
 
-            for i,losses in enumerate(all_losses):
-                for loss_name,loss in losses.items():
-                    writer.add_scalar(str(i)+loss_name, loss, itrs)
             writer.add_scalar("working_loss", working_loss, itrs)
             writer.add_scalar("perception_loss", perception_loss, itrs)
             writer.add_scalar("language_loss", language_loss, itrs)
@@ -325,7 +328,7 @@ def train_Archerus(train_model, config, args):
                 visualize_image_grid(gt_ims[0].cpu().detach(), row = 1, save_name = "val_gt_image")
 
                 
-                single_comps =  torchvision.utils.make_grid(masks[0:1].cpu().detach().permute([0,1,4,2,3]).flatten(start_dim = 0, end_dim = 1),normalize=True,nrow=num_slots).permute(1,2,0)
+                single_comps =  torchvision.utils.make_grid((masks*gt_ims)[0:1].cpu().detach().permute([0,1,4,2,3]).flatten(start_dim = 0, end_dim = 1),normalize=True,nrow=num_slots).permute(1,2,0)
                 visualize_image_grid(single_comps.cpu().detach(), row = 1, save_name = "slot_masks")
                 #visualize_psg(gt_ims[0:1].cpu().detach(), outputs["abstract_scene"], args.effective_level)
 

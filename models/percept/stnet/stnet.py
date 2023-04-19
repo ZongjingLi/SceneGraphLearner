@@ -469,32 +469,40 @@ class FeatureDecoder(nn.Module):
 class SceneGraphLevel(nn.Module):
     def __init__(self, num_slots,config):
         super().__init__()
-
+        iters = 7
         in_dim = config.object_dim
         self.layer_embedding = nn.Parameter(torch.randn(num_slots, in_dim))
         self.constuct_quarter = SlotAttention(num_slots,in_dim = in_dim,slot_dim = in_dim, iters = 5)
         self.hermit = nn.Linear(config.object_dim,in_dim)
-        self.outward = nn.Linear(in_dim,in_dim)
+        self.outward = nn.Linear(in_dim,in_dim, bias = False)
+        self.propagator = GraphPropagation(num_iters = iters)
 
     def forward(self,inputs):
         in_features = inputs["features"]
         in_scores = inputs["scores"]
-        B = in_scores.shape[0]
+        B, N = in_scores.shape[0],in_scores.shape[1]
+
+
+        raw_spatials = in_features[-2:]
+
+        adjs = torch.tanh(0.1 * torch.linalg.norm(
+         raw_spatials.unsqueeze(1).repeat(1,N,1,1) - 
+         raw_spatials.unsqueeze(2).repeat(1,1,N,1), dim = -1)) 
 
         if False:
             construct_features, construct_attn = self.connstruct_quarter(in_features)
             # [B,N,C]
         else:
             construct_features, construct_attn = in_features, in_scores
-
-        construct_features = self.hermit(construct_features)
+        construct_feature = self.propagator(construct_features,adjs)[-1]
+        #construct_features = self.hermit(construct_features)
 
         proposal_features = self.layer_embedding.unsqueeze(0).repeat(B,1,1)
 
         match = torch.softmax(in_scores * torch.einsum("bnc,bmc -> bnm",in_features, proposal_features)/math.sqrt(0.1), dim = -1)
 
         out_features = torch.einsum("bnc,bnm->bmc",construct_features, match)
-        out_features = self.outward(out_features)
+        #out_features = self.outward(out_features)
 
         out_scores = torch.max(match, dim = 1).values.unsqueeze(-1)
 
