@@ -12,7 +12,7 @@ all_questions = []
 for i in range(130):
     questions_answer_pairs = []
     if i <= 83:
-        answer = True
+        answer = "yes"
     else:
         answer = "no"
     questions_answer_pairs.append(
