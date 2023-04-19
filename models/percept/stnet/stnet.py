@@ -467,9 +467,9 @@ class FeatureDecoder(nn.Module):
 
 
 class SceneGraphLevel(nn.Module):
-    def __init__(self, config):
+    def __init__(self, num_slots,config):
         super().__init__()
-        num_slots = 3
+
         in_dim = config.object_dim
         self.layer_embedding = nn.Parameter(torch.randn(num_slots, in_dim))
         self.constuct_quarter = SlotAttention(num_slots,in_dim = in_dim,slot_dim = in_dim, iters = 5)
@@ -491,21 +491,22 @@ class SceneGraphLevel(nn.Module):
 
         out_features = torch.einsum("bnc,bnm->bmc",construct_features, match)
 
-        out_scores = torch.max(match, dim = 1).values
+        out_scores = torch.max(match, dim = 1).values.unsqueeze(-1)
 
         in_masks = inputs["masks"]
         out_masks = torch.einsum("bwhm,bmn->bwhn",in_masks,match)
 
 
 
-        return {"features":out_features,"scores":out_scores, "masks":out_masks}
+        return {"features":out_features,"scores":out_scores, "masks":out_masks, "match":match}
 
 class SceneGraphNet(nn.Module):
     def __init__(self, config):
         super().__init__()
         self.backbone = PSGNet(config.imsize, config.perception_size, config.object_dim - 2)
         self.scene_graph_levels = nn.ModuleList([
-            SceneGraphLevel(config)
+            SceneGraphLevel(10, config),
+            #SceneGraphLevel(4, config)
         ])
 
     def forward(self, ims):
@@ -538,14 +539,9 @@ class SceneGraphNet(nn.Module):
         for k in range(K):
             #local_masks[cluster_r] = 1
             local_masks[:,:,:,k] = torch.where(k == cluster_r,1,0)
-        #print(K)
-        #print(cluster_r.shape)
-        #local_masks = local_masks.reshape([B,W,H,K])
-
-        #print(torch.sum(local_masks, dim = -1))
 
         # [Construct the Base Level]
-        base_scene = {"scores":torch.ones(B,P,1),"features":base_features,"masks":local_masks}
+        base_scene = {"scores":torch.ones(B,P,1),"features":base_features,"masks":local_masks,"match":False}
         abstract_scene = [base_scene]
 
         # [Construct the Scene Level]
