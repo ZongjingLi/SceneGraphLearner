@@ -35,3 +35,15 @@ class AcherusImageDataset(Dataset):
         sample = {"image":image.permute(1,2,0)}
         return sample
 
+class AcherusDataset(Dataset):
+    def __init__(self, split = "train", resolution = (128,128)):
+        super().__init__()
+        self.resolution = resolution
+        self.path = "/Users/melkor/Documents/datasets/acherus/train/{}.jpg"
+        #self.images = sorted(glob(self.path))
+        self.img_transform = transforms.Compose(
+            [transforms.ToTensor()]
+        )
+        self.file_names = os.listdir("/Users/melkor/Documents/datasets/acherus/{}/".format(split,split))
+
+    def __len__(self): return 130
