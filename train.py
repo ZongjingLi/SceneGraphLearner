@@ -178,6 +178,7 @@ def train(model, config, args):
     print("\n\nExperiment {} : Training Completed.".format(args.name))
 
 def train_Archerus(train_model, config, args):
+
     query = True if args.training_mode in ["joint", "query"] else False
     print("\nstart the experiment: {} query:[{}]".format(args.name,query))
     print("experiment config: \nepoch: {} \nbatch: {} samples \nlr: {}\n".format(args.epoch,args.batch_size,args.lr))
@@ -191,8 +192,12 @@ def train_Archerus(train_model, config, args):
             train_dataset = ToyDataWithQuestions("train", resolution = config.resolution)
         else:
             train_dataset = ToyData("train", resolution = config.resolution)
-    if args.dataset == "Elbon":
-        train_dataset = AcherusImageDataset("train")
+    if args.dataset == "Acherus":
+        if query:
+            print("Elbon Blade Crusade for You")
+            train_dataset = AcherusDataset("train")
+        else:
+            train_dataset = AcherusImageDataset("train")
     if args.training_mode == "query":
         freeze_parameters(train_model.scene_perception.backbone)
 
@@ -259,14 +264,16 @@ def train_Archerus(train_model, config, args):
                         working_scene = [top_level_scene]
 
                         scores   = top_level_scene["scores"][b,...] - EPS
-                        scores   = torch.clamp(scores, min = EPS, max = 1)
+                        scores   = torch.clamp(scores, min = EPS, max = 1).reshape([-1])
 
-                        features = top_level_scene["features"][b]
+                        #scores = scores.unsqueeze(0)
+
+                        features = top_level_scene["features"][b].reshape([scores.shape[0],-1])
 
 
                         edge = 1e-6
                         if config.concept_type == "box":
-                            features = torch.cat([features,edge * torch.ones(features.shape)],-1)
+                            features = torch.cat([features,edge * torch.ones(features.shape)],-1)#.unsqueeze(0)
 
                         kwargs = {"features":features,
                                   "end":scores }
@@ -286,6 +293,7 @@ def train_Archerus(train_model, config, args):
                             else:language_loss -= torch.log(1 - torch.sigmoid(o["end"]))
                             if itrs % args.checkpoint_itrs == 0:
                                 print(q,answer)
+                                print(F.sigmoid(o["end"]).cpu().detach().numpy())
                                 answer_distribution_binary(F.sigmoid(o["end"]).cpu().detach().numpy())
             # [calculate the working loss]
             working_loss = perception_loss * alpha + language_loss * beta
@@ -323,169 +331,6 @@ def train_Archerus(train_model, config, args):
             sys.stdout.write ("\rEpoch: {}, Itrs: {} Loss: {} Percept:{} Language:{}, Time: {}".format(epoch + 1, itrs, working_loss,perception_loss,language_loss,datetime.timedelta(seconds=time.time() - start)))
         writer.add_scalar("epoch_loss", epoch_loss, epoch)
     print("\n\nExperiment {} : Training Completed.".format(args.name))
-
-
-def train_TBC(model, config, args):
-    name = args.name
-    if config.domain == "ptr":
-        dataset = None
-    if config.domain == "toy":
-        dataset = ToyDataWithQuestions("train")
-
-    if args.training_mode == "joint":
-        try:
-            print("object score allowed")
-            model.scene_perception.allow_obj_score()
-        except:pass
-
-    print("Joint!")
-
-    logging_root = "./logs"
-    ckpt_dir     = os.path.join(logging_root, 'checkpoints')
-    events_dir   = os.path.join(logging_root, 'events')
-    if not os.path.exists(ckpt_dir): os.makedirs(ckpt_dir)
-    if not os.path.exists(events_dir): os.makedirs(events_dir)
-
-    # setup the checkpoint location and initalize the SummaryWritter
-    writer = SummaryWriter(events_dir)
-
-    if args.optimizer == "Adam":
-        optimizer = torch.optim.Adam(model.parameters(), lr = args.lr)
-    if args.optimizer == "RMSprop":
-        optimizer = torch.optim.RMSprop(model.parameters(), lr = args.lr)
-    dataloader = DataLoader(dataset, batch_size = args.batch_size, shuffle = args.shuffle)
-    
-
-    itrs = 0
-    start = time.time() # record the start time of the training
-    for epoch in range(args.epoch):
-        total_loss = 0
-        for sample in dataloader:
-
-            # check to engage in warmup training 
-            if args.warmup and itrs < args.warmup_steps:
-                learning_rate = args.lr * ((1 + itrs)/args.warmup_steps)
-            else:
-                learning_rate = args.lr
-
-            optimizer.param_groups[0]["lr"] = learning_rate # setup the lr params
-
-            working_loss = 0
-            # execute the model according to the training mode
-            if True or args.training_mode == "perception" or args.training_mode == "joint":
-                inputs = sample["image"].to(args.device)
-                gt_ims = inputs
-
-                try:outputs = model.scene_perception(inputs)
-                except:outputs = model(inputs)
-
-                # get the components
-                full_recon = outputs["full_recons"]
-                recons     = outputs["recons"]
-                masks      = outputs["masks"]
-                loss       = outputs["loss"]
-
-                if args.training_mode != "query":
-                    working_loss += loss * 1000
-
-            if args.training_mode == "query" or args.training_mode == "joint":
-                query_loss = 0
-                for question in sample["question"]:
-                    for b in range(len(question["program"])):
-                        program = question["program"][b] # string program
-                        answer  = question["answer"][b]  # string answer
-
-                        scores   = torch.clamp(outputs["object_scores"][b,...,0] - EPS, min=-1,max=1)
-                        
-            
-                        features = outputs["object_features"][b]
-
-
-                        edge = 1e-6
-                        if config.concept_type == "box":
-                            features = torch.cat([features,edge * torch.ones(features.shape, device = args.device)],-1)
-
-                        kwargs = {"features":features,
-                                  "end":scores }
-
-                        q = model.executor.parse(program)
-                        
-                        o = model.executor(q, **kwargs)
-                        #print("Batch:{}".format(b),q,o["end"],answer)
-                        
-                        if answer in numbers:
-                            int_num = torch.tensor(numbers.index(answer)).float().to(args.device)
-                            query_loss += F.mse_loss(int_num + 1,o["end"])
-                            if itrs % args.checkpoint_itrs == 0:
-                                print(q,answer)
-                                answer_distribution_num(o["end"].cpu().detach().numpy(),1+int_num.cpu().detach().numpy())
-                        if answer in yes_or_no:
-                            if answer == "yes":query_loss -= F.logsigmoid(o["end"])
-                            else:query_loss -= torch.log(1 - torch.sigmoid(o["end"]))
-                            if itrs % args.checkpoint_itrs == 0:
-                                print(q,answer)
-                                answer_distribution_binary(F.sigmoid(o["end"]).cpu().detach().numpy())
-                        #print(scores.float().detach().numpy())
-
-                working_loss += query_loss * 0.003
-
-             # calculate the working loss of the batch
-
-            # back propagation to update the working loss
-            optimizer.zero_grad()
-            working_loss.backward()
-            optimizer.step()
-            total_loss += working_loss.detach()
-
-            sys.stdout.write ("\rEpoch: {}, Itrs: {} Loss: {}, Time: {}".format(epoch + 1, itrs, working_loss,datetime.timedelta(seconds=time.time() - start)))
-
-            if itrs % args.checkpoint_itrs == 0:
-                writer.add_scalar("working_loss", working_loss, itrs)
-                if args.training_mode == "perception":
-                    torch.save(model.scene_perception,"checkpoints/{}_{}_{}.ckpt".format(name,config.domain,config.perception))
-                else:
-                    torch.save(model,"checkpoints/{}_joint_{}_{}.ckpt".format(name,config.domain,config.perception))
-                if args.training_mode == "joint" or args.training_mode == "query":
-                    writer.add_scalar("qa_loss", query_loss, itrs)
-                writer.add_scalar("vision_loss", loss, itrs)
-                if True or args.training_mode == "perception" or args.training_mode == "joint":
-                    # load the images, reconstructions, and other thing
-                    num_slots = recons.shape[1]
-
-                    recon_grid = torchvision.utils.make_grid(recons.cpu().detach().permute([0,1,4,2,3]).flatten(start_dim = 0, end_dim = 1),normalize=True,nrow=num_slots)
-                    writer.add_image("Recons",recon_grid.cpu().detach().numpy(),itrs)
-    
-                    masks_grid = torchvision.utils.make_grid(masks.cpu().detach().permute([0,1,4,2,3]).flatten(start_dim = 0, end_dim = 1),normalize=True,nrow=num_slots)
-                    writer.add_image("Masks",masks_grid.cpu().detach().numpy(),itrs)
-
-                    comps_grid = torchvision.utils.make_grid((recons*masks).cpu().detach().permute([0,1,4,2,3]).flatten(start_dim = 0, end_dim = 1),normalize=True,nrow=num_slots)
-                    writer.add_image("Components",comps_grid.cpu().detach().numpy(),itrs)
-
-                    grid = torchvision.utils.make_grid(full_recon.cpu().detach().permute([0,3,1,2]),normalize=True,nrow=args.batch_size)
-                    writer.add_image("Full Recons",grid.cpu().detach().numpy(),itrs)
-
-                    gt_grid = torchvision.utils.make_grid(sample["image"].cpu().detach().permute([0,3,1,2]),normalize=True,nrow=args.batch_size)
-                    writer.add_image("GT Image",gt_grid.cpu().detach().numpy(),itrs)
-
-                    writer.add_image("Backup",gt_grid.cpu().detach().numpy(),itrs)    
-
-                    visualize_outputs(inputs,outputs)
-
-                    visualize_scores(outputs["object_scores"][0:1,:,0].cpu().detach().numpy(), name="val_scores")   
-
-                    visualize_image_grid(gt_ims[0].cpu().detach(), row = 1, save_name = "val_gt_image")
-                    visualize_image_grid(full_recon[0].cpu().detach(), row = 1, save_name = "val_recon_image")
-                    
-
-                    single_comps =  torchvision.utils.make_grid((recons*masks)[0:1].cpu().detach().permute([0,1,4,2,3]).flatten(start_dim = 0, end_dim = 1),normalize=True,nrow=num_slots).permute(1,2,0)
-                    visualize_image_grid(single_comps.cpu().detach(), row = 1, save_name = "comps")
-
-            itrs += 1
-        total_loss = total_loss/len(dataloader)
-        writer.add_scalar("epoch_loss",total_loss,epoch)
-
-    print("\n\nExperiment {} : Training Completed.".format(args.name))
-
 
 argparser = argparse.ArgumentParser()
 # [general config of the training]
@@ -531,6 +376,7 @@ else:
         config.perception = "psgnet"
         model = SceneLearner(config)
     elif args.name == "Elbon":
+        print("Elbon Blade Training Set")
         config.perception = "psgnet"
         args.dataset = "Elbon"
         model = SceneLearner(config)
@@ -549,7 +395,7 @@ elif args.name == "Acherus":
     train_Archerus(model, config, args)
 elif args.name == "Elbon":
     print("The Elbon Blade")
-    args.dataset_name = "Acherus"
+    args.dataset = "Acherus"
     config.perception = "psgnet"
     train_Archerus(model, config, args)
 

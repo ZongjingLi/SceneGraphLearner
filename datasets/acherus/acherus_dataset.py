@@ -46,4 +46,14 @@ class AcherusDataset(Dataset):
         )
         self.file_names = os.listdir("/Users/melkor/Documents/datasets/acherus/{}/".format(split,split))
 
+        self.questions = load_json("/Users/melkor/Documents/datasets/acherus/{}_questions.json".format(split))
+
     def __len__(self): return 130
+
+    def __getitem__(self, index):
+        image = Image.open(self.path.format(index))
+        image = image.convert("RGB").resize(self.resolution)
+        image = self.img_transform(image)
+
+        sample = {"image":image.permute(1,2,0),"question":self.questions[index]}
+        return sample
