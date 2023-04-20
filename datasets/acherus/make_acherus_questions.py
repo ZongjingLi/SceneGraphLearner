@@ -9,9 +9,9 @@ def save_json(data,path):
 
 all_questions = []
 
-for i in range(130):
+for i in range(400):
     questions_answer_pairs = []
-    if i <= 83:
+    if i <= 199:
         answer = "yes"
         count = "one"
         count_obj = "1"

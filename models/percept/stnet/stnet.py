@@ -469,13 +469,16 @@ class FeatureDecoder(nn.Module):
 class SceneGraphLevel(nn.Module):
     def __init__(self, num_slots,config):
         super().__init__()
-        iters = 7
+        iters = 10
         in_dim = config.object_dim
         self.layer_embedding = nn.Parameter(torch.randn(num_slots, in_dim))
         self.constuct_quarter = SlotAttention(num_slots,in_dim = in_dim,slot_dim = in_dim, iters = 5)
         self.hermit = nn.Linear(config.object_dim,in_dim)
         self.outward = nn.Linear(in_dim,in_dim, bias = False)
         self.propagator = GraphPropagation(num_iters = iters)
+
+        node_feat_size = in_dim
+        self.graph_conv = GraphConv(node_feat_size , node_feat_size ,aggr = "mean") 
 
     def forward(self,inputs):
         in_features = inputs["features"]
@@ -489,12 +492,17 @@ class SceneGraphLevel(nn.Module):
          raw_spatials.unsqueeze(1).repeat(1,N,1,1) - 
          raw_spatials.unsqueeze(2).repeat(1,1,N,1), dim = -1)) 
 
+        #edges = torch.sigmoid(adjs).int()
+
+
         if False:
             construct_features, construct_attn = self.connstruct_quarter(in_features)
             # [B,N,C]
         else:
             construct_features, construct_attn = in_features, in_scores
-        construct_feature = self.propagator(construct_features,adjs)[-1]
+        construct_features[-2:] = 1 * construct_features[-2:]
+        #construct_features = self.graph_conv(construct_features, edges)
+        construct_features = self.propagator(construct_features,adjs)[-1]
         #construct_features = self.hermit(construct_features)
 
         proposal_features = self.layer_embedding.unsqueeze(0).repeat(B,1,1)

@@ -136,6 +136,7 @@ class Filter(SymbolicProgram):
 
         filter_logit = torch.min(child["end"], mask)
         query_object = mask[..., 0].max(-1).indices
+        #print(filter_logit)
         return {**child, "end": filter_logit, 
             "feature": executor.kwargs["features"], "query_object": query_object}
 

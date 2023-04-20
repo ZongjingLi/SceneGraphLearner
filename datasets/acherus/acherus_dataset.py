@@ -26,7 +26,7 @@ class AcherusImageDataset(Dataset):
 
 
     def __len__(self):
-        return 130
+        return 399
 
     def __getitem__(self, index):
         image = Image.open(self.path.format(index))
@@ -48,7 +48,7 @@ class AcherusDataset(Dataset):
 
         self.questions = load_json("/Users/melkor/Documents/datasets/acherus/{}_questions.json".format(split))
 
-    def __len__(self): return 130
+    def __len__(self): return 399
 
     def __getitem__(self, index):
         image = Image.open(self.path.format(index))

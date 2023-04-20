@@ -48,14 +48,14 @@ from PIL import ImageGrab
 import matplotlib.pyplot as plt
 
 
-if __name__ == "__main":
+if __name__ == "__main__":
     for i in range(200):
         off_set = 60
         curr = time.time()
         #pyautogui.screenshot("{}.jpg".format(i))
         screen = np.array(ImageGrab.grab(bbox=(20,10+off_set,844,484+off_set)))
         #plt.imshow(screen)
-        plt.imsave("/Users/melkor/Documents/datasets/acherus/train/{}.jpg".format(0 + i),screen)
+        plt.imsave("/Users/melkor/Documents/datasets/acherus/train/{}.jpg".format(200 + i),screen)
         now  = time.time()
         print(i,now - curr)
         #pyautogui.press("w",100)
