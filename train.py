@@ -381,7 +381,8 @@ else:
     elif args.name == "Acherus":
         config.perception = "psgnet"
         model = SceneLearner(config)
-    elif args.name == "Elbon":
+    elif args.name == "Elbon" or "PTR":
+        config.domain = "PTR"
         print("Elbon Blade Training Set")
         config.perception = "psgnet"
         args.dataset = "Elbon"
@@ -399,9 +400,11 @@ elif args.name == "Acherus":
     print("Assault on New Avalon")
     config.perception = "psgnet"
     train_Archerus(model, config, args)
-elif args.name == "Elbon":
+elif args.name == "Elbon" or "PTR":
     print("The Elbon Blade")
     args.dataset = "Acherus"
+    if args.name == "PTR":
+        args.dataset = "ptr"
     config.perception = "psgnet"
     train_Archerus(model, config, args)
 
