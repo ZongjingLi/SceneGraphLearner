@@ -18,8 +18,8 @@ parser.add_argument("--imsize",             default = 128)
 parser.add_argument("--resolution",         default = (128,128))
 parser.add_argument("--hidden_dim",         default = 100)
 
-parser.add_argument("--object_num",         default = 5)
-parser.add_argument("--part_num",           default = 3)
+parser.add_argument("--object_num",         default = 6)
+parser.add_argument("--part_num",           default = 4)
 
 # setup the concept learner 
 parser.add_argument("--concept_type",       default = "box")
