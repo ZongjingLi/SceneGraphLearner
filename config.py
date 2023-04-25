@@ -23,8 +23,8 @@ parser.add_argument("--part_num",           default = 3)
 
 # setup the concept learner 
 parser.add_argument("--concept_type",       default = "cone")
-parser.add_argument("--concept_dim",        default = 66)
-parser.add_argument("--object_dim",         default = 66)
+parser.add_argument("--concept_dim",        default = 102)
+parser.add_argument("--object_dim",         default = 102)
 parser.add_argument("--temperature",        default = 5)
 
 # box concept methods
@@ -35,6 +35,6 @@ parser.add_argument("--entries",            default = 10)
 parser.add_argument("--translator",         default = translator)
 
 # hiearchy graph generation
-parser.add_argument("--global_feature_dim", default = 64)
+parser.add_argument("--global_feature_dim", default = 66)
 
 config = parser.parse_args(args = [])
