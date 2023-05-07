@@ -324,6 +324,8 @@ class SceneGraphLevel(nn.Module):
         #edges = torch.sigmoid(adjs).int()
 
 
+
+
         if False:
             construct_features, construct_attn = self.connstruct_quarter(in_features)
             # [B,N,C]
