@@ -323,9 +323,6 @@ class SceneGraphLevel(nn.Module):
 
         #edges = torch.sigmoid(adjs).int()
 
-
-
-
         if False:
             construct_features, construct_attn = self.connstruct_quarter(in_features)
             # [B,N,C]
@@ -355,6 +352,56 @@ class SceneGraphLevel(nn.Module):
 
 
         return {"features":out_features,"scores":out_scores, "masks":out_masks, "match":match}
+
+class LocalSceneGraphLevel(nn.Module):
+    def __init__(self, config):
+        super().__init__()
+
+class LocalSceneGraphNet(nn.Module):
+    def __init__(self, config):
+        super().__init__()
+        self.backbone = PSGNet(config.imsize, config.perception_size)
+        self.scene_graph_levels = nn.ModuleList([
+            LocalSceneGraphLevel(5, config)
+        ])
+
+    def forward(self, ims):
+        # [PSGNet first two layers as the Backbone]
+        B,W,H,C = ims.shape
+        primary_scene = self.backbone(ims) # create the base level scene representation [Image]
+
+        psg_features = 0
+        base_features = 0
+
+        # [Compute the Base Mask]
+        clusters = primary_scene["clusters"]
+
+        local_masks = []
+        for i in range(len(clusters)):
+            cluster_r = clusters[i][0];
+            for cluster_j,batch_j in reversed(clusters[:i]):
+                cluster_r = cluster_r[cluster_j].unsqueeze(0).reshape([B,W,H])
+
+                local_masks.append(cluster_r)
+
+        K = int(cluster_r.max()) + 1 # Cluster size
+        local_masks = torch.zeros([B,W,H,K])
+        
+        for k in range(K):
+            #local_masks[cluster_r] = 1
+            local_masks[:,:,:,k] = torch.where(k == cluster_r,1,0)
+
+        base_scene = {"scores":torch.ones(B,P,1),"features":base_features,"masks":local_masks,"match":False}
+        abstract_scene = [base_scene]
+
+        # [Construct the Scene Level]
+        for merger in self.scene_graph_levels:
+            construct_scene = merger(abstract_scene[-1])
+            abstract_scene.append(construct_scene)
+
+        primary_scene["abstract_scene"] = abstract_scene
+
+        return primary_scene
 
 class SceneGraphNet(nn.Module):
     def __init__(self, config):

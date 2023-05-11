@@ -394,6 +394,10 @@ if args.pretrain_perception:
 #model = torch.load("checkpoints/TBC_joint_toy_slot_attention.ckpt", map_location=args.device)
 #model.scene_perception.slot_attention.iters = 10
 
+if args.name == "Valkyr":
+    print("Val'kyr start the training session.")
+    pass
+
 if args.name == "TBC":
     train_TBC(model, config, args)
 elif args.name == "Acherus":
