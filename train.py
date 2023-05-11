@@ -278,6 +278,7 @@ if args.pretrain_perception:
 
 if args.name == "Valkyr":
     print("Val'kyr start the training session.")
+    args.dataset = "Acherus"
     train_Valkyr(model, config, args)
 
 
