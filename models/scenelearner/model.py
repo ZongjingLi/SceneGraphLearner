@@ -18,6 +18,8 @@ class SceneLearner(nn.Module):
         # [Unsupervised Part-Centric Representation]
         if config.perception == "psgnet":
             self.scene_perception = SceneGraphNet(config)
+        if config.perception == "local_psgnet":
+            self.scene_perception = LocalSceneGraphNet(config)
         if config.perception == "slot_attention":
             self.scene_perception = SlotAttentionParser(config.object_num, config.object_dim,5)
             self.part_perception = SlotAttention(config.part_num, config.object_dim,5)
