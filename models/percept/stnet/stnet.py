@@ -375,11 +375,7 @@ class LocalSceneGraphLevel(nn.Module):
 
         raw_spatials = in_features[-2:]
 
-        adjs = torch.tanh(0.1 * torch.linalg.norm(
-         raw_spatials.unsqueeze(1).repeat(1,N,1,1) - 
-         raw_spatials.unsqueeze(2).repeat(1,1,N,1), dim = -1)) 
 
-        #edges = torch.sigmoid(adjs).int()
 
         if False:
             construct_features, construct_attn = self.connstruct_quarter(in_features)
@@ -388,12 +384,7 @@ class LocalSceneGraphLevel(nn.Module):
             construct_features, construct_attn = in_features, in_scores
         construct_features[-2:] = 1 * construct_features[-2:]
         construct_features[:-2] = construct_features[:-2]/math.sqrt(C)
-        #construct_features = self.graph_conv(construct_features, edges)
-        
-        #construct_features = self.hermit(construct_features)
-        #construct_features = self.propagator(construct_features,adjs)[-1]
-        
-        
+
 
         proposal_features = self.layer_embedding.unsqueeze(0).repeat(B,1,1)
 
@@ -415,7 +406,7 @@ class LocalSceneGraphLevel(nn.Module):
 class LocalSceneGraphNet(nn.Module):
     def __init__(self, config):
         super().__init__()
-        self.backbone = PSGNet(config.imsize, config.perception_size)
+        self.backbone = PSGNet(config.imsize, config.perception_size, config.object_dim - 2 )
         self.scene_graph_levels = nn.ModuleList([
             LocalSceneGraphLevel(5, config)
         ])
@@ -424,17 +415,21 @@ class LocalSceneGraphNet(nn.Module):
         # [PSGNet as the Backbone]
         B,W,H,C = ims.shape
         primary_scene = self.backbone(ims)
-        psg_features = to_dense_features(primary_scene)[-1]
+        psg_features = primary_scene
+
+        print(psg_features["features"][-1].shape)
+        print(psg_features["centroids"][-1].shape)
 
         base_features = torch.cat([
-            psg_features["features"],
-            psg_features["centroids"],
+            psg_features["features"][-1],
+            psg_features["centroids"][-1],
         ],dim = -1)
-        B = psg_features["features"].shape[0]
-        P = psg_features["features"].shape[1]
+        B = psg_features["features"][-1].shape[0]
+        P = psg_features["features"][-1].shape[1]
 
         # [Compute the Base Mask]
-        clusters = primary_scene["clusters"]
+        clusters = primary_scene["clusters"][-1]
+        print(len(clusters))
 
         local_masks = []
         for i in range(len(clusters)):

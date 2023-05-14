@@ -54,7 +54,7 @@ class AffinityConditionedAggregation(torch.nn.Module, ABC):
 
         coarsened_x, coarsened_batch = max_pool_x(cluster_labels, x, batch)
 
-        # [Very Sucptible Step, Why use this way to coarse edges]
+        # [Very Suceptible Step, Why use this way to coarse edges]
         coarsened_edge_index = coalesce(cluster_labels[filtered_edge_index],
                               None, coarsened_x.size(0), coarsened_x.size(0))[0]
 

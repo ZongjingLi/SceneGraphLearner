@@ -256,18 +256,19 @@ else:
     if args.name == "TBC":
         config.perception = "slot_attention"
         model = SceneLearner(config)
-    elif args.name == "Acherus":
+    if args.name == "Acherus":
         config.perception = "psgnet"
         model = SceneLearner(config)
-    elif args.name == "Elbon" or "PTR":
+    if args.name == "Elbon" or "PTR":
         config.domain = "PTR"
         print("Elbon Blade Training Set")
         config.perception = "psgnet"
         args.dataset = "Elbon"
         model = SceneLearner(config)
-    elif args.name == "Valkyr":
+    if args.name == "Valkyr":
         config.perception = "local_psgnet"
         args.dataset = "Elbon"
+        print("Init the Local Scene Graph Net")
         model = SceneLearner(config)
 
 if args.pretrain_perception:
