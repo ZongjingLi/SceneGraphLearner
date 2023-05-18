@@ -160,7 +160,7 @@ class ControlPSGNet(torch.nn.Module):
 class ControlSceneGraphNet(nn.Module):
     def __init__(self, config):
         super().__init__()
-        self.backbone = PSGNet(config.imsize, config.perception_size, config.object_dim - 2)
+        self.backbone = ControlPSGNet(config.imsize, config.perception_size, config.object_dim - 2)
 
     def forward(self, ims):
         # [Calculate Mask at each level]
@@ -200,7 +200,6 @@ class ControlSceneGraphNet(nn.Module):
         abstract_scene = [base_scene]
 
         # [Construct the Scene Level]
-
 
         primary_scene["abstract_scene"] = abstract_scene
 
