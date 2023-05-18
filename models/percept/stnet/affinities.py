@@ -11,6 +11,11 @@ from .primary import *
 
 device = "cuda:0" if torch.cuda.is_available() else "cpu"
 
+class ControlBasedAggregation(torch.nn.Module, ABC):
+    @abstractmethod
+    def affinities_and_thresholds(self, x, row, col):
+        pass
+
 class AffinityConditionedAggregation(torch.nn.Module, ABC):
 
     # Takes in tensor of node pairs and returns an affinity tensor and a 
@@ -104,6 +109,7 @@ class P1AffinityAggregation(AffinityConditionedAggregation):
         affinity_thresh   = torch.min(inv_mean_affinity[row],
                                       inv_mean_affinity[col])
         return edge_affinities.to(device), affinity_thresh.to(device), {}
+
 
 def LP_clustering(num_nodes,edge_index,num_iter=50,device=device):
 
