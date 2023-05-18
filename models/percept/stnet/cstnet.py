@@ -1,3 +1,4 @@
+from tkinter.tix import Control
 from .stnet import *
 
 class ControlPSGNet(torch.nn.Module):
@@ -31,14 +32,22 @@ class ControlPSGNet(torch.nn.Module):
             if s == 2: self.affinity_aggregations.append(P2AffinityAggregation())
         
         self.control_aggregations = torch.nn.ModuleList([])
-        control = [10,4]
+        control = [10]
         for i in control:
-            self.control_aggregations.append()
+            self.control_aggregations.append(ControlBasedAggregation())
             
 
         # Node transforms: function applied on aggregated node vectors
-
+        # [Aggregate]
         self.node_transforms = torch.nn.ModuleList([
+            FCBlock(hidden_ch=100,
+                    num_hidden_layers=3,
+                    in_features =node_feat_size + 4,
+                    out_features=node_feat_size,
+                    outermost_linear=True) for _ in range(len(self.affinity_aggregations))
+        ])
+        # [Control]
+        self.control_node_transforms = torch.nn.ModuleList([
             FCBlock(hidden_ch=100,
                     num_hidden_layers=3,
                     in_features =node_feat_size + 4,
@@ -51,6 +60,9 @@ class ControlPSGNet(torch.nn.Module):
         self.graph_convs = torch.nn.ModuleList([
             GraphConv(node_feat_size , node_feat_size ,aggr = "mean")   for _ in range(len(self.affinity_aggregations))
         ])
+        self.control_graph_convs = torch.nn.ModuleList([
+            GraphConv(node_feat_size , node_feat_size ,aggr = "mean")   for _ in range(len(self.control_aggregations))
+        ])
 
         # Maps cluster vector to constant pixel color
         self.node_to_rgb  = FCBlock(hidden_ch=100,
@@ -58,11 +70,8 @@ class ControlPSGNet(torch.nn.Module):
                                     in_features =20,
                                     out_features=3,
                                     outermost_linear=True)
-
         self.node_to_qtr_p1  = FCBlock(100,3,node_feat_size,6 * 3,outermost_linear = True)
         self.node_to_qtr_p2  = FCBlock(100,3,node_feat_size,6 * 3,outermost_linear = True)
-        self.gauge = nn.Linear(node_feat_size,node_feat_size)
-
 
     def forward(self,img,effective_mask = None):
         batch_size = img.shape[0]
@@ -130,7 +139,8 @@ class ControlPSGNet(torch.nn.Module):
 
             level_centroids.append(centroids)
             level_moments.append(moments)
-            
+
+
         # [joint Spatial features contruction with locality constraints]
         joint_spatial_features = []
         for i,(cluster_r,_) in enumerate(clusters):
