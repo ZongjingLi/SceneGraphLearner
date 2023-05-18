@@ -31,10 +31,9 @@ class ControlPSGNet(torch.nn.Module):
             if s == 1: self.affinity_aggregations.append(P1AffinityAggregation())
             if s == 2: self.affinity_aggregations.append(P2AffinityAggregation())
         
-        self.control_aggregations = torch.nn.ModuleList([])
         control = [10]
         for i in control:
-            self.control_aggregations.append(ControlBasedAggregation())
+            self.affinity_aggregations.append(ControlBasedAggregation())
             
 
         # Node transforms: function applied on aggregated node vectors
@@ -46,23 +45,12 @@ class ControlPSGNet(torch.nn.Module):
                     out_features=node_feat_size,
                     outermost_linear=True) for _ in range(len(self.affinity_aggregations))
         ])
-        # [Control]
-        self.control_node_transforms = torch.nn.ModuleList([
-            FCBlock(hidden_ch=100,
-                    num_hidden_layers=3,
-                    in_features =node_feat_size + 4,
-                    out_features=node_feat_size,
-                    outermost_linear=True) for _ in range(len(self.affinity_aggregations))
-        ])
 
         # Graph convolutional layers to apply after each graph coarsening
-        gcv = GraphConv(node_feat_size, node_feat_size)  
         self.graph_convs = torch.nn.ModuleList([
             GraphConv(node_feat_size , node_feat_size ,aggr = "mean")   for _ in range(len(self.affinity_aggregations))
         ])
-        self.control_graph_convs = torch.nn.ModuleList([
-            GraphConv(node_feat_size , node_feat_size ,aggr = "mean")   for _ in range(len(self.control_aggregations))
-        ])
+
 
         # Maps cluster vector to constant pixel color
         self.node_to_rgb  = FCBlock(hidden_ch=100,
@@ -72,6 +60,7 @@ class ControlPSGNet(torch.nn.Module):
                                     outermost_linear=True)
         self.node_to_qtr_p1  = FCBlock(100,3,node_feat_size,6 * 3,outermost_linear = True)
         self.node_to_qtr_p2  = FCBlock(100,3,node_feat_size,6 * 3,outermost_linear = True)
+
 
     def forward(self,img,effective_mask = None):
         batch_size = img.shape[0]
@@ -139,10 +128,10 @@ class ControlPSGNet(torch.nn.Module):
 
             level_centroids.append(centroids)
             level_moments.append(moments)
+            
 
-
-        # [joint Spatial features contruction with locality constraints]
         joint_spatial_features = []
+
         for i,(cluster_r,_) in enumerate(clusters):
             for cluster_j,_ in reversed(clusters[:i]):cluster_r = cluster_r[cluster_j]
             centroids = scatter_mean(self.spatial_coords.repeat(batch_size,1),cluster_r,dim = 0)
@@ -150,10 +139,12 @@ class ControlPSGNet(torch.nn.Module):
             joint_features = torch.cat([self.node_to_qtr_p2(intermediates[i]),centroids],-1)
             joint_spatial_features.append(joint_features)
 
-        # [Add the reconstructions to the spatial edges for reconstruction loss]
         recons = [] # perform reconstruction over each layer composed
+
         for i,jsf in enumerate(joint_spatial_features):
             for cluster,_ in reversed(clusters[:i+1]):jsf = jsf[cluster]
+
+            
             paint_by_numbers = to_dense_batch( 1.0 *  (\
                 RenderQTR(self.spatial_coords.repeat(batch_size,1),jsf))\
                     ,graph_in.batch)[0]
@@ -165,53 +156,3 @@ class ControlPSGNet(torch.nn.Module):
         "centroids":level_centroids, 
         "moments":level_moments,
         "batch":level_batch}
-
-
-class ControlSceneGraphNet(nn.Module):
-    def __init__(self, config):
-        super().__init__()
-        self.backbone = ControlPSGNet(config.imsize, config.perception_size, config.object_dim - 2)
-
-    def forward(self, ims):
-        # [Calculate Mask at each level]
-
-        # [PSGNet as the Backbone]
-        B,W,H,C = ims.shape
-        primary_scene = self.backbone(ims)
-        psg_features = to_dense_features(primary_scene)[-1]
-
-        base_features = torch.cat([
-            psg_features["features"],
-            psg_features["centroids"],
-        ],dim = -1)
-        B = psg_features["features"].shape[0]
-        P = psg_features["features"].shape[1]
-
-        # [Compute the Base Mask]
-        clusters = primary_scene["clusters"]
-
-        local_masks = []
-        for i in range(len(clusters)):
-            cluster_r = clusters[i][0];
-            for cluster_j,batch_j in reversed(clusters[:i]):
-                cluster_r = cluster_r[cluster_j].unsqueeze(0).reshape([B,W,H])
-
-                local_masks.append(cluster_r)
-
-        K = int(cluster_r.max()) + 1 # Cluster size
-        local_masks = torch.zeros([B,W,H,K])
-        
-        for k in range(K):
-            #local_masks[cluster_r] = 1
-            local_masks[:,:,:,k] = torch.where(k == cluster_r,1,0)
-
-        # [Construct the Base Level]
-        base_scene = {"scores":torch.ones(B,P,1),"features":base_features,"masks":local_masks,"match":False}
-        abstract_scene = [base_scene]
-
-        # [Construct the Scene Level]
-
-        primary_scene["abstract_scene"] = abstract_scene
-
-        return primary_scene
-
