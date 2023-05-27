@@ -328,14 +328,12 @@ class SceneGraphLevel(nn.Module):
             # [B,N,C]
         else:
             construct_features, construct_attn = in_features, in_scores
-        construct_features[-2:] = 1 * construct_features[-2:]
-        construct_features[:-2] = construct_features[:-2]/math.sqrt(C)
+        construct_features[-4:] = 5 * construct_features[-4:]
+        construct_features[-4:] = 0.1 * construct_features[-4:]/math.sqrt(C)
         #construct_features = self.graph_conv(construct_features, edges)
         
         #construct_features = self.hermit(construct_features)
-        #construct_features = self.propagator(construct_features,adjs)[-1]
-        
-        
+        #construct_features = self.propagator(construct_features,adjs)[-1]        
 
         proposal_features = self.layer_embedding.unsqueeze(0).repeat(B,1,1)
 

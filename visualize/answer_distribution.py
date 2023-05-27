@@ -9,7 +9,7 @@ def visualize_image_grid(images, row, save_name = "image_grid"):
     plt.figure(save_name, frameon = False);plt.cla()
     plt.tick_params(left = False, right = False , labelleft = False ,
                 labelbottom = False, bottom = False)
-    print(images.shape)
+
     comps_grid = torchvision.utils.make_grid(images,normalize=True,nrow=row)
     
     plt.imshow(comps_grid.cpu().detach().numpy())

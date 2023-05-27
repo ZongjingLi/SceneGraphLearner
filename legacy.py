@@ -17,6 +17,43 @@ from torch.utils.tensorboard import SummaryWriter
 import torchvision
 from skimage import color
 
+
+def freeze_parameters(model):
+    for param in model.parameters():
+        param.requires_grad = False
+def unfreeze_parameters(model):
+    for param in model.parameters():
+        param.requires_grad = True
+
+def log_imgs(imsize,pred_img,clusters,gt_img,writer,iter_):
+
+    batch_size = pred_img.shape[0]
+    
+    # Write grid of output vs gt 
+    grid = torchvision.utils.make_grid(
+                          lin2img(torch.cat((pred_img.cpu(),gt_img.cpu()))),
+                          normalize=True,nrow=batch_size)
+
+    # Write grid of image clusters through layers
+    cluster_imgs = []
+    for i,(cluster,_) in enumerate(clusters):
+        for cluster_j,_ in reversed(clusters[:i+1]): cluster = cluster[cluster_j]
+        pix_2_cluster = to_dense_batch(cluster,clusters[0][1])[0]
+        cluster_2_rgb = torch.tensor(color.label2rgb(
+                    pix_2_cluster.detach().cpu().numpy().reshape(-1,imsize,imsize) 
+                                    ))
+        cluster_imgs.append(cluster_2_rgb)
+    cluster_imgs = torch.cat(cluster_imgs)
+    grid2=torchvision.utils.make_grid(cluster_imgs.permute(0,3,1,2),nrow=batch_size)
+    writer.add_image("Clusters",grid2.detach().numpy(),iter_)
+    writer.add_image("Output_vs_GT",grid.detach().numpy(),iter_)
+    writer.add_image("Output_vs_GT Var",grid.detach().numpy(),iter_)
+
+    visualize_image_grid(cluster_imgs[batch_size,...], row = 1, save_name = "val_cluster")
+    visualize_image_grid(pred_img.reshape(batch_size,imsize,imsize,3)[0,...], row = 1, save_name = "val_recon")
+
+
+
 def train(model, config, args):
     query = True if args.training_mode in ["joint", "query"] else False
     print("\nstart the experiment: {} query:[{}]".format(args.name,query))
@@ -151,6 +188,7 @@ def train_Archerus(train_model, config, args):
     print("experiment config: \nepoch: {} \nbatch: {} samples \nlr: {}\n".format(args.epoch,args.batch_size,args.lr))
     
     #[setup the training and validation dataset]
+
     if args.dataset == "ptr":
         train_dataset = PTRData("train", resolution = config.resolution)
         val_dataset =  PTRData("val", resolution = config.resolution)
@@ -200,7 +238,7 @@ def train_Archerus(train_model, config, args):
             # [perception module training]
             gt_ims = torch.tensor(sample["image"].numpy()).float().to(config.device)
 
-            outputs = model.scene_perception(gt_ims)
+            outputs = train_model.scene_perception(gt_ims)
 
             # get the components
             recons, clusters, all_losses = outputs["recons"],outputs["clusters"],outputs["losses"]

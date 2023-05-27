@@ -282,8 +282,6 @@ if args.name == "Valkyr":
     args.dataset = "Acherus"
     train_Valkyr(model, config, args)
 
-
-"""
 if args.name == "TBC":
     train_TBC(model, config, args)
 elif args.name == "Acherus":
@@ -292,10 +290,9 @@ elif args.name == "Acherus":
     train_Archerus(model, config, args)
 elif args.name == "Elbon" or "PTR":
     print("The Elbon Blade")
-    args.dataset = "Acherus"
+    args.dataset = "toy"
     if args.name == "PTR":
         args.dataset = "ptr"
     config.perception = "psgnet"
     train_Archerus(model, config, args)
 
-"""
