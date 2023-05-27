@@ -1,1 +1,1 @@
-/Users/melkor/miniforge3/envs/Melkor/bin/python train.py --name="Valkyr" --training_mode="joint"
+/Users/melkor/miniforge3/envs/Melkor/bin/python train.py --name="Elbon" --training_mode="joint" --checkpoint_dir="checkpoints/Elbon_perception_toy_psgnet.ckpt"
