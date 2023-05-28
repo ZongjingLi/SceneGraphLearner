@@ -334,7 +334,7 @@ def train_Archerus(train_model, config, args):
                 elif train_model.rep == "cone":
                     results = {"embedding":train_model.box_registry.cones(idx),
                             "label":entries}
-                concept_visualizer.visualize(results,train_model, concept_split_specs,itrs / args.checkpoint_itrs)
+                #concept_visualizer.visualize(results,train_model, concept_split_specs,itrs / args.checkpoint_itrs)
                 name = args.name
                 expr = args.training_mode
                 num_slots = masks.shape[1]

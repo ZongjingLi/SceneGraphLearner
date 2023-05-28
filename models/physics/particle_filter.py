@@ -15,6 +15,7 @@ import pybullet_data
 import numpy as np
 
 from utils import * 
+from .match import Matcher
 # TODO: IOU geometry import
 
 class _ParticleUpdater(object):

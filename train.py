@@ -222,13 +222,13 @@ argparser.add_argument("--device",                  default = config.device)
 argparser.add_argument("--name",                    default = "KFT")
 argparser.add_argument("--epoch",                   default = 400)
 argparser.add_argument("--optimizer",               default = "Adam")
-argparser.add_argument("--lr",                      default = 2e-4)
+argparser.add_argument("--lr",                      default = 5e-4)
 argparser.add_argument("--batch_size",              default = 1)
 argparser.add_argument("--dataset",                 default = "toy")
 
 # [perception and language grounding training]
 argparser.add_argument("--training_mode",           default = "joint")
-argparser.add_argument("--alpha",                   default = 100.000)
+argparser.add_argument("--alpha",                   default = 1.000)
 argparser.add_argument("--beta",                    default = 0.001)
 
 # [additional training details]
