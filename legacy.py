@@ -12,6 +12,7 @@ from datasets import *
 from config import *
 from models import *
 from visualize.answer_distribution import *
+from visualize.concepts.concept_embedding import *
 
 from torch.utils.tensorboard import SummaryWriter
 import torchvision
@@ -231,6 +232,8 @@ def train_Archerus(train_model, config, args):
     if not os.path.exists(events_dir): os.makedirs(events_dir)
     writer = SummaryWriter(events_dir)
 
+    concept_visualizer = ConceptEmbeddingVisualizer(0, writer)
+
     for epoch in range(args.epoch):
         epoch_loss = 0
         for sample in dataloader:
@@ -321,6 +324,17 @@ def train_Archerus(train_model, config, args):
             writer.add_scalar("language_loss", language_loss, itrs)
 
             if not(itrs % args.checkpoint_itrs):
+                num_concepts = 8
+                concept_split_specs = [0] * num_concepts
+                entries = list(range(num_concepts))
+                idx = torch.tensor(entries).int()
+                if train_model.rep == "box":
+                    results = {"embedding":train_model.box_registry.boxes(idx),
+                            "label":entries}
+                elif train_model.rep == "cone":
+                    results = {"embedding":train_model.box_registry.cones(idx),
+                            "label":entries}
+                concept_visualizer.visualize(results,train_model, concept_split_specs,itrs / args.checkpoint_itrs)
                 name = args.name
                 expr = args.training_mode
                 num_slots = masks.shape[1]

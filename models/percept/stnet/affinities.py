@@ -97,7 +97,7 @@ class AffinityConditionedAggregation(torch.nn.Module, ABC):
 
         if x.size(0) != 0:
             try:
-                node_labels    = LP_clustering(x.size(0), filtered_edge_index, 20).to(device)
+                node_labels    = LP_clustering(x.size(0), filtered_edge_index, 30).to(device)
             except:
                 node_labels = torch.arange(x.size(0))
         else:

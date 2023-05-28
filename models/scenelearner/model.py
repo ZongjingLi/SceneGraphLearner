@@ -28,6 +28,7 @@ class SceneLearner(nn.Module):
 
         # [Neuro Symbolic Executor]
         self.executor = SceneProgramExecutor(config)
+        self.rep = config.concept_type
 
     def parse(self, program):return self.executor.parse(program)
     

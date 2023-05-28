@@ -9,6 +9,7 @@ class BoxRegistry(nn.Module):
         self.dim = config.concept_dim
 
         entries = config.entries
+        self.entries = entries
 
         init_config = config
         self.boxes = self._init_embedding_(entries, init_config)

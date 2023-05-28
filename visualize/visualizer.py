@@ -23,7 +23,7 @@ class Visualizer:
 
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)
-        name = Visualizer.get_name()
+        name = Visualizer.get_name("ConceptVisualizer")
         cls.VISUALIZER_REGISTRY[name] = cls
         cls.name = name
 
