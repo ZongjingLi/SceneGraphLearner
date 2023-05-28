@@ -16,7 +16,8 @@ import numpy as np
 
 from utils import * 
 from .match import Matcher
-# TODO: IOU geometry import
+from .step import Stepper
+from utils.geometry import iou
 
 class _ParticleUpdater(object):
     def __init__(self, config, t, belief, camera, observation_history = None):

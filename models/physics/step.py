@@ -22,3 +22,4 @@ class Stepper(object):
             self.accelerate_penalty = 1.0
 
             self.accelerate_lambda = 0.5
+    

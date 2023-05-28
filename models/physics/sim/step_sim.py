@@ -23,3 +23,10 @@ def step(objects, forward = True):
 def reverse_step(config):
     """Reverse step a simulation"""
     return step(config, False)
+
+def neuro_step(objects, forward = True):
+    new_objects = []
+    return new_objects
+
+def neuro_reverse_step(config):
+    return step(config, False)
