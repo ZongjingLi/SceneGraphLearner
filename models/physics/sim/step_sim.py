@@ -1,7 +1,7 @@
 import pybullet as p
 import os
 
-from models.physics.sim.lite_step_objects import LiteObjectManager
+from .lite_step_objects import LiteObjectManager
 
 step_time = 4
 sim_time_step = 0.01
