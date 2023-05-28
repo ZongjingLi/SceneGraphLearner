@@ -328,7 +328,7 @@ class SceneGraphLevel(nn.Module):
             # [B,N,C]
         else:
             construct_features, construct_attn = in_features, in_scores
-        construct_features[-4:] = 5 * construct_features[-4:]
+        construct_features[-4:] = 3 * construct_features[-4:]
         construct_features[-4:] = 0.1 * construct_features[-4:]/math.sqrt(C)
         #construct_features = self.graph_conv(construct_features, edges)
         
