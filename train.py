@@ -260,7 +260,7 @@ else:
         config.perception = "psgnet"
         model = SceneLearner(config)
     if args.name == "Elbon" or "PTR":
-        config.domain = "PTR"
+        config.domain = "toy"
         print("Elbon Blade Training Set")
         config.perception = "psgnet"
         args.dataset = "Elbon"

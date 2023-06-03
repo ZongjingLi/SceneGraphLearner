@@ -184,6 +184,7 @@ def train(model, config, args):
 
 def train_Archerus(train_model, config, args):
 
+    train_model = train_model.to(config.device)
     query = True if args.training_mode in ["joint", "query"] else False
     print("\nstart the experiment: {} query:[{}]".format(args.name,query))
     print("experiment config: \nepoch: {} \nbatch: {} samples \nlr: {}\n".format(args.epoch,args.batch_size,args.lr))
@@ -304,7 +305,7 @@ def train_Archerus(train_model, config, args):
                             if itrs % args.checkpoint_itrs == 0:
                                 print(q,answer)
                                 print(torch.sigmoid(o["end"]).cpu().detach().numpy())
-                                visualize_scores(scores.reshape([args.batch_size,-1,1]).detach())
+                                visualize_scores(scores.reshape([args.batch_size,-1,1]).cpu().detach())
                                 answer_distribution_binary(torch.sigmoid(o["end"]).cpu().detach().numpy())
             # [calculate the working loss]
             working_loss = perception_loss * alpha + language_loss * beta

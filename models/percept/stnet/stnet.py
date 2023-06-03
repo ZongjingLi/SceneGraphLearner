@@ -128,16 +128,24 @@ class PSGNet(torch.nn.Module):
 
         self.node_transforms = torch.nn.ModuleList([
             FCBlock(hidden_ch=100,
-                    num_hidden_layers=3,
+                    num_hidden_layers=2,
                     in_features =node_feat_size + 4,
-                    out_features=node_feat_size,
+                    out_features=node_feat_size + 0,
                     outermost_linear=True) for _ in range(len(self.affinity_aggregations))
         ])
 
         # Graph convolutional layers to apply after each graph coarsening
-        gcv = GraphConv(node_feat_size, node_feat_size)  
+        gcv = GraphConv(node_feat_size, node_feat_size) 
+
+        def make_gcv(node_feat_size):
+            gcv_sequence = nn.Sequential([
+                GraphConv(node_feat_size , node_feat_size ,aggr = "max"),
+                GraphConv(node_feat_size , node_feat_size ,aggr = "max")
+            ])
+            return GraphConv(node_feat_size , node_feat_size ,aggr = "max")
+
         self.graph_convs = torch.nn.ModuleList([
-            GraphConv(node_feat_size , node_feat_size ,aggr = "mean")   for _ in range(len(self.affinity_aggregations))
+            GraphConv(node_feat_size , node_feat_size ,aggr = "max") for _ in range(len(self.affinity_aggregations))
         ])
 
         # Maps cluster vector to constant pixel color
@@ -212,7 +220,9 @@ class PSGNet(torch.nn.Module):
     
 
             # augument each node with explicit calculation of moment and centroids
-            x = torch.cat([x,centroids,moments],dim = -1)
+            cast = 10.0
+            x = torch.cat([x,cast * centroids,cast * moments],dim = -1)
+            
             x = transf(x)
             x = conv(x, edge_index)
 
@@ -464,7 +474,7 @@ class SceneGraphNet(nn.Module):
         super().__init__()
         self.backbone = PSGNet(config.imsize, config.perception_size, config.object_dim - 2)
         self.scene_graph_levels = nn.ModuleList([
-            SceneGraphLevel(5, config),
+            SceneGraphLevel(8, config),
             #SceneGraphLevel(4, config)
         ])
 
