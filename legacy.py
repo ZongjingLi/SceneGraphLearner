@@ -296,20 +296,20 @@ def train_Archerus(train_model, config, args):
                             int_num = torch.tensor(numbers.index(answer)).float().to(args.device)
                             language_loss += F.mse_loss(int_num + 1,o["end"])
                             if itrs % args.checkpoint_itrs == 0:
-                                print(q,answer)
-                                visualize_scores(scores.reshape([args.batch_size,-1,1]).detach())
+                                #print(q,answer)
+                                visualize_scores(scores.reshape([args.batch_size,-1,1]).cpu().detach())
                                 answer_distribution_num(o["end"].cpu().detach().numpy(),1+int_num.cpu().detach().numpy())
                         if answer in yes_or_no:
                             if answer == "yes":language_loss -= torch.log(torch.sigmoid(o["end"]))
                             else:language_loss -= torch.log(1 - torch.sigmoid(o["end"]))
                             if itrs % args.checkpoint_itrs == 0:
-                                print(q,answer)
-                                print(torch.sigmoid(o["end"]).cpu().detach().numpy())
+                                #print(q,answer)
+                                #print(torch.sigmoid(o["end"]).cpu().detach().numpy())
                                 visualize_scores(scores.reshape([args.batch_size,-1,1]).cpu().detach())
                                 answer_distribution_binary(torch.sigmoid(o["end"]).cpu().detach().numpy())
             # [calculate the working loss]
             working_loss = perception_loss * alpha + language_loss * beta
-            epoch_loss += working_loss.detach().numpy()
+            epoch_loss += working_loss.detach().cpu().numpy()
 
             # [backprop and optimize parameters]
             for i,losses in enumerate(all_losses):
@@ -326,15 +326,7 @@ def train_Archerus(train_model, config, args):
 
             if not(itrs % args.checkpoint_itrs):
                 num_concepts = 8
-                concept_split_specs = [0] * num_concepts
-                entries = list(range(num_concepts))
-                idx = torch.tensor(entries).int()
-                if train_model.rep == "box":
-                    results = {"embedding":train_model.box_registry.boxes(idx),
-                            "label":entries}
-                elif train_model.rep == "cone":
-                    results = {"embedding":train_model.box_registry.cones(idx),
-                            "label":entries}
+
                 #concept_visualizer.visualize(results,train_model, concept_split_specs,itrs / args.checkpoint_itrs)
                 name = args.name
                 expr = args.training_mode

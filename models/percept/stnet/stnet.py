@@ -396,7 +396,7 @@ class LocalSceneGraphLevel(nn.Module):
 
         proposal_features = self.layer_embedding.unsqueeze(0).repeat(B,1,1)
 
-        match = torch.softmax(in_scores * torch.einsum("bnc,bmc -> bnm",in_features, proposal_features)/0.1, dim = -1)
+        match = torch.softmax(in_scores * torch.einsum("bnc,bmc -> bnm",in_features, proposal_features)/0.02, dim = -1)
 
         out_features = torch.einsum("bnc,bnm->bmc",construct_features, match)
         #out_features = self.outward(out_features)
@@ -480,6 +480,8 @@ class SceneGraphNet(nn.Module):
 
     def forward(self, ims):
         # [PSGNet as the Backbone]
+
+        device = "cuda:0" if torch.cuda.is_available() else "cpu"
         B,W,H,C = ims.shape
         primary_scene = self.backbone(ims)
         psg_features = to_dense_features(primary_scene)[-1]
@@ -503,14 +505,14 @@ class SceneGraphNet(nn.Module):
                 local_masks.append(cluster_r)
 
         K = int(cluster_r.max()) + 1 # Cluster size
-        local_masks = torch.zeros([B,W,H,K])
+        local_masks = torch.zeros([B,W,H,K]).to(device)
         
         for k in range(K):
             #local_masks[cluster_r] = 1
             local_masks[:,:,:,k] = torch.where(k == cluster_r,1,0)
 
         # [Construct the Base Level]
-        base_scene = {"scores":torch.ones(B,P,1),"features":base_features,"masks":local_masks,"match":False}
+        base_scene = {"scores":torch.ones(B,P,1).to(device),"features":base_features,"masks":local_masks,"match":False}
         abstract_scene = [base_scene]
 
         # [Construct the Scene Level]
