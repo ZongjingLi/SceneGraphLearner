@@ -111,3 +111,10 @@ class PropModule(nn.Module):
         nf_effect = config.nf_effect
 
         self.nf_effect = nf_effect
+        self.residual = residual
+
+        # Particle Encoder
+        self.particle_encoder = ParticleEncoder(
+            input_dim, nf_particle, nf_effect
+        )
+        # Relation Encoder
