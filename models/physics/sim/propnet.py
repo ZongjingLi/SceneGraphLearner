@@ -118,3 +118,27 @@ class PropModule(nn.Module):
             input_dim, nf_particle, nf_effect
         )
         # Relation Encoder
+        self.relation_encoder = RelationEncoder(
+            2 * input_dim + relation_dim, nf_relation, nf_relation
+        )
+
+        # input: (1) particle encode (2) particle effect
+        self.particle_propagator = Propagator(
+            2 * nf_effect, nf_effect, self.residual
+        )
+
+        # input: (1) relation encode (2) sender_effect (3) receiver effect
+        self.relation_propagator = Propagator(
+            nf_relation + 2 * nf_effect, nf_effect
+        )
+
+        # input: (1) particle effect
+        self.particle_predictor = ParticlePredictor(
+            nf_effect, nf_effect, output_dim
+        )
+
+    def forward(self, state, Rr, Rs, Ra, pstep):
+
+        # calculate the particle encoding
+        particle_effect = Variable(torch.zeros((state.shape[0], state.shape[1], self.nf_effect)))
+        
