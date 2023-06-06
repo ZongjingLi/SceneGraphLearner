@@ -270,12 +270,20 @@ else:
         args.dataset = "Elbon"
         print("Init the Local Scene Graph Net")
         model = SceneLearner(config)
-
+    if args.name == "Sprites":
+        config.domain = "sprites"
+        args.dataset = "sprites"
+        print("Init the Sprites Scene Graph Net")
+        model = SceneLearner(config)
 if args.pretrain_perception:
     model.scene_perception = torch.load(args.pretrain_perception, map_location = config.device)
 
 #model = torch.load("checkpoints/TBC_joint_toy_slot_attention.ckpt", map_location=args.device)
 #model.scene_perception.slot_attention.iters = 10
+print(args.name)
+if args.name == "Sprites":
+    print("Val'kyr start the training session.")
+    train_Archerus(model, config, args)
 
 if args.name == "Valkyr":
     print("Val'kyr start the training session.")

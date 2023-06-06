@@ -25,11 +25,15 @@ class SpriteWithQuestions(Dataset):
         image = image.convert("RGB").resize(self.resolution) 
         image = self.img_transform(image).permute([1,2,0]) 
 
-        question = [q["question"] for q in self.questions[index]]
+        #question = [q["question"] for q in self.questions[index]]
         programs  = [p["program"] for p in self.questions[index]]
         answers   = [a["answer"] for a in self.questions[index]]
 
-        sample = {"image":image,"question":question,"program":programs,"answer":answers}
+        questions = []
+        for i in range(len(programs)):
+            questions.append({"program":programs[i], "answer":answers[i]})
+
+        sample = {"image":image,"question":questions}
         return sample
 
 

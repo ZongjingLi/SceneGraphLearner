@@ -199,6 +199,11 @@ def train_Archerus(train_model, config, args):
             train_dataset = ToyDataWithQuestions("train", resolution = config.resolution)
         else:
             train_dataset = ToyData("train", resolution = config.resolution)
+    if args.dataset == "sprites":
+        if query:
+            train_dataset = SpriteWithQuestions("train", resolution = config.resolution)
+        else:
+            train_dataset = SpriteData("train", resolution = config.resolution)
     if args.dataset == "Acherus":
         if query:
             print("Elbon Blade Crusade for You")
