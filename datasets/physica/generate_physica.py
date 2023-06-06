@@ -28,6 +28,19 @@ class BoxSprite(PhysicsSprite):
         self.height = height
 
 
+def make_body(env, name, x, y, friction = 43.9, mass = 30.0):
+    size = 32
+    moment = pymunk.moment_for_box(mass, (size, size))
+    body = pymunk.Body(mass, moment)
+    body.position = pymunk.Vec2d(x, y)
+    shape = pymunk.Poly.create_box(body, (size, size))
+    shape.elasticity = 0.001
+    shape.friction = 43.9
+    env.space.add(body, shape)
+
+    sprite = BoxSprite(shape, "/Users/melkor/Documents/datasets/PatchWork/{}".format(name), width=size, height=size)
+    env.sprite_list.append(sprite)
+
 class MyGame(arcade.Window):
     """ Main application class. """
 
@@ -60,42 +73,23 @@ class MyGame(arcade.Window):
         self.space.add(shape, body)
         self.static_lines.append(shape)
 
+        size = 32
+
         # Create the stacks of boxes
         for row in range(10):
             for column in range(3):
-                size = 32
-                mass = 30.0
-                x = 500 + column * 32
-                y = (floor_height + size / 2) + row * size
-                moment = pymunk.moment_for_box(mass, (size, size))
-                body = pymunk.Body(mass, moment)
-                body.position = pymunk.Vec2d(x, y)
-                shape = pymunk.Poly.create_box(body, (size, size))
-                shape.elasticity = 0.2
-                shape.friction = 0.9
-                self.space.add(body, shape)
-                # body.sleep()
-
-                sprite = BoxSprite(shape, "/Users/melkor/Documents/datasets/PatchWork/pillar1_pettyDwarf_side.png", width=size, height=size)
-                self.sprite_list.append(sprite)
+                make_body(self, "pillar1_pettyDwarf_side.png",
+                 500 + column* size,
+                  size * row + (floor_height + size / 2), friction = 100, mass =1000)
 
         for row in range(10):
             for column in range(3):
-                size = 32
-                mass = 30.0
-                x = 400 + column * 32 + size * 10
-                y = (floor_height + size / 2) + row * size
-                moment = pymunk.moment_for_box(mass, (size, size))
-                body = pymunk.Body(mass, moment)
-                body.position = pymunk.Vec2d(x, y)
-                shape = pymunk.Poly.create_box(body, (size, size))
-                shape.elasticity = 0.001
-                shape.friction = 43.9
-                self.space.add(body, shape)
-                # body.sleep()
+                make_body(self, "crafting_table_gondolin_bottom.png",
+                 300 + column* size,
+                  size * row + (floor_height + size / 2), friction = 500, mass =100)
 
-                sprite = BoxSprite(shape, "/Users/melkor/Documents/datasets/PatchWork/pillar1_pettyDwarf_side.png", width=size, height=size)
-                self.sprite_list.append(sprite)
+        make_body(self, "tol_in_gaurhoth_torch.png", 700, (floor_height + size / 2))
+        
 
     def on_draw(self):
         """
@@ -145,7 +139,7 @@ class MyGame(arcade.Window):
             inertia = pymunk.moment_for_circle(mass, 0, radius, (0, 0))
             body = pymunk.Body(mass, inertia)
             body.position = x, y
-            body.velocity = 1200, 100
+            body.velocity = 1500, 100
             shape = pymunk.Circle(body, radius, pymunk.Vec2d(0, 0))
             shape.friction = 33.3
             self.space.add(body, shape)
@@ -169,7 +163,7 @@ class MyGame(arcade.Window):
         for sprite in self.sprite_list:
             x = sprite.pymunk_shape.position.x
             y = sprite.pymunk_shape.position.y
-            
+
 
     def on_update(self, delta_time):
         start_time = timeit.default_timer()
