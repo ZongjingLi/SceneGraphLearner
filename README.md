@@ -3,9 +3,7 @@
 
 This repo is the Hierarchical Concept Learner
 
-<p align="center">
-![img](/src/framework.png)
-</p>
+![](src/framework.png)
 
 # Physical Scene Graph Network
 This repo is trying to reproduce the project "Learning Physical Graph Representations from Visual Scenes". Apply Gestalt principles in unsupervised 
