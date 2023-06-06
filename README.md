@@ -3,4 +3,6 @@
 
 This repo is the Hierarchical Concept Learner
 
-![]
+<p align="center">
+![logo](outputs/framework.png)
+</p>
