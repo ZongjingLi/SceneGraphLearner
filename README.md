@@ -4,5 +4,5 @@
 This repo is the Hierarchical Concept Learner
 
 <p align="center">
-![img](outputs/framework.png)
+![img](/outputs/framework.png)
 </p>
