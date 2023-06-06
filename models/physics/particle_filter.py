@@ -19,6 +19,7 @@ from .match import Matcher
 from .step import Stepper
 from utils.geometry import iou
 
+
 class _ParticleUpdater(object):
     def __init__(self, config, t, belief, camera, observation_history = None):
         self.camera = camera

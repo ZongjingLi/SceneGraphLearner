@@ -4,3 +4,4 @@ from .partnet import *
 from .toy import *
 from .ptr import *
 from .acherus import *
+from .physica import *
