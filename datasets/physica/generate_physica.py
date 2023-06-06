@@ -34,7 +34,7 @@ class MyGame(arcade.Window):
     def __init__(self, width, height, title):
         super().__init__(width, height, title)
 
-        arcade.set_background_color(arcade.color.DARK_SLATE_GRAY)
+        arcade.set_background_color((61,77,86))
 
         # -- Pymunk
         self.space = pymunk.Space()
@@ -76,14 +76,14 @@ class MyGame(arcade.Window):
                 self.space.add(body, shape)
                 # body.sleep()
 
-                sprite = BoxSprite(shape, "assets/ims/PatchWork/pillar1_pettyDwarf_side.png", width=size, height=size)
+                sprite = BoxSprite(shape, "/Users/melkor/Documents/datasets/PatchWork/pillar1_pettyDwarf_side.png", width=size, height=size)
                 self.sprite_list.append(sprite)
 
         for row in range(10):
             for column in range(3):
                 size = 32
                 mass = 30.0
-                x = 500 + column * 32 + size * 10
+                x = 400 + column * 32 + size * 10
                 y = (floor_height + size / 2) + row * size
                 moment = pymunk.moment_for_box(mass, (size, size))
                 body = pymunk.Body(mass, moment)
@@ -94,7 +94,7 @@ class MyGame(arcade.Window):
                 self.space.add(body, shape)
                 # body.sleep()
 
-                sprite = BoxSprite(shape, "assets/ims/PatchWork/pillar1_pettyDwarf_side.png", width=size, height=size)
+                sprite = BoxSprite(shape, "/Users/melkor/Documents/datasets/PatchWork/pillar1_pettyDwarf_side.png", width=size, height=size)
                 self.sprite_list.append(sprite)
 
     def on_draw(self):
@@ -117,7 +117,7 @@ class MyGame(arcade.Window):
 
             pv1 = body.position + line.a.rotated(body.angle)
             pv2 = body.position + line.b.rotated(body.angle)
-            arcade.draw_line(pv1.x, pv1.y, pv2.x, pv2.y, arcade.color.WHITE, 2)
+            arcade.draw_line(pv1.x, pv1.y, pv2.x, pv2.y, (39,45,52), 2)
 
         # Display timings
         output = f"Processing time: {self.processing_time:.3f}"
@@ -141,11 +141,11 @@ class MyGame(arcade.Window):
         elif button == arcade.MOUSE_BUTTON_RIGHT:
             # With right mouse button, shoot a heavy coin fast.
             mass = 100
-            radius = 10
+            radius = 20
             inertia = pymunk.moment_for_circle(mass, 0, radius, (0, 0))
             body = pymunk.Body(mass, inertia)
             body.position = x, y
-            body.velocity = 2000, 100
+            body.velocity = 1200, 100
             shape = pymunk.Circle(body, radius, pymunk.Vec2d(0, 0))
             shape.friction = 33.3
             self.space.add(body, shape)
@@ -164,6 +164,12 @@ class MyGame(arcade.Window):
             self.last_mouse_position = x, y
             self.shape_being_dragged.shape.body.position = self.last_mouse_position
             self.shape_being_dragged.shape.body.velocity = dx * 20, dy * 20
+
+    def save_states(self):
+        for sprite in self.sprite_list:
+            x = sprite.pymunk_shape.position.x
+            y = sprite.pymunk_shape.position.y
+            
 
     def on_update(self, delta_time):
         start_time = timeit.default_timer()
