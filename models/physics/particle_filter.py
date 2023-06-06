@@ -19,6 +19,7 @@ from .match import Matcher
 from .step import Stepper
 from utils.geometry import iou
 
+from .sim import *
 
 class _ParticleUpdater(object):
     def __init__(self, config, t, belief, camera, observation_history = None):
@@ -57,3 +58,14 @@ class FilterUpdate(object):
     def __init__(self, config, belief, case_name, camera, n_filter):
         self.t = 0
         self.config = config
+
+
+class NeuroParticleFilter(nn.Module):
+    def __init__(self, config):
+        super().__init__()
+
+        # [Stepper] aka prediction module
+        self.stepper = PropNet(config)
+
+        # [Matcher] ask observation module
+        self.matcher = Matcher(config)
