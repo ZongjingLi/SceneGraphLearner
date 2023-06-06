@@ -296,7 +296,9 @@ def train_Archerus(train_model, config, args):
                         
                         o = train_model.executor(q, **kwargs)
                         #print("Batch:{}".format(b),q,o["end"],answer)
-                        
+                        if answer in ["True","False"]:answer = {"True":"yes,","False":"no"}[answer]
+                        if answer in ["1","2","3","4","5"]:answer = num2word(int(answer))
+
                         if answer in numbers:
                             int_num = torch.tensor(numbers.index(answer)).float().to(args.device)
                             language_loss += F.mse_loss(int_num + 1,o["end"])
@@ -342,8 +344,8 @@ def train_Archerus(train_model, config, args):
                 visualize_image_grid(gt_ims.flatten(start_dim = 0, end_dim = 1).cpu().detach(), row = args.batch_size, save_name = "ptr_gt_perception")
                 visualize_image_grid(gt_ims[0].cpu().detach(), row = 1, save_name = "val_gt_image")
 
-                
-                single_comps =  torchvision.utils.make_grid((masks*gt_ims)[0:1].cpu().detach().permute([0,1,4,2,3]).flatten(start_dim = 0, end_dim = 1),normalize=True,nrow=num_slots).permute(1,2,0)
+                # * gt_ims
+                single_comps =  torchvision.utils.make_grid((masks )[0:1].cpu().detach().permute([0,1,4,2,3]).flatten(start_dim = 0, end_dim = 1),normalize=True,nrow=num_slots).permute(1,2,0)
                 visualize_image_grid(single_comps.cpu().detach(), row = 1, save_name = "slot_masks")
                 #visualize_psg(gt_ims[0:1].cpu().detach(), outputs["abstract_scene"], args.effective_level)
 

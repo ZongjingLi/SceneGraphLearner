@@ -203,7 +203,7 @@ def answer_distribution_num(count, target, name = "answer_distribution"):
     plt.plot(x,y)
     plt.scatter(target,1)
     plt.scatter(count,np.exp( 0 - (target-count) * (target-count) / 2))
-
+    
     plt.savefig("outputs/{}.png".format(name))
     
 

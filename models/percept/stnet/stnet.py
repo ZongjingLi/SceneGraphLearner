@@ -474,7 +474,7 @@ class SceneGraphNet(nn.Module):
         super().__init__()
         self.backbone = PSGNet(config.imsize, config.perception_size, config.object_dim - 2)
         self.scene_graph_levels = nn.ModuleList([
-            SceneGraphLevel(8, config),
+            SceneGraphLevel(5, config),
             #SceneGraphLevel(4, config)
         ])
 
