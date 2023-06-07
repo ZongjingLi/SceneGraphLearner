@@ -84,15 +84,18 @@ def generate_toy_dataset(num, resolution = (128,128), questions = False):
         background_image = np.random.choice([bg1,bg2])
         screen.blit(background_image, [0, 0])
         scene = []
+        cats = [0,1,2]
 
         for _ in range(np.random.choice([0,1,2,3])):
+
             scale = np.random.randint(resolution[0]/12,resolution[0] / 9)
             # choose the color to draw
             color = random_color()
             px,py = random_coord(scale, resolution)
 
-            # control the portion of different kind of objects generated
-            category = np.random.choice([0,1,2], p = [0.2, 0.4, 0.4])
+            # control the portion of different kind of objects generated [0.2, 0.4, 0.4]
+            category = np.random.choice(cats,)
+            cats.remove(category)
             
             if category == 0:
                 # draw tower

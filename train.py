@@ -228,8 +228,8 @@ argparser.add_argument("--dataset",                 default = "toy")
 
 # [perception and language grounding training]
 argparser.add_argument("--training_mode",           default = "joint")
-argparser.add_argument("--alpha",                   default = 100.00)
-argparser.add_argument("--beta",                    default = 0.0001)
+argparser.add_argument("--alpha",                   default = 10.00)
+argparser.add_argument("--beta",                    default = 0.001)
 
 # [additional training details]
 argparser.add_argument("--warmup",                  default = True)

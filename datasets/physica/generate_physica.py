@@ -134,7 +134,7 @@ class MyGame(arcade.Window):
 
         elif button == arcade.MOUSE_BUTTON_RIGHT:
             # With right mouse button, shoot a heavy coin fast.
-            mass = 100
+            mass = 200
             radius = 20
             inertia = pymunk.moment_for_circle(mass, 0, radius, (0, 0))
             body = pymunk.Body(mass, inertia)
