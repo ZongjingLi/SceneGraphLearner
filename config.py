@@ -13,7 +13,7 @@ parser.add_argument("--domain",             default = "toy")
 
 # setup the perception module
 parser.add_argument("--perception",         default = "slot_attention")
-parser.add_argument("--perception_size",    default = 3)
+parser.add_argument("--perception_size",    default = 2)
 parser.add_argument("--imsize",             default = 128)
 parser.add_argument("--resolution",         default = (128,128))
 parser.add_argument("--hidden_dim",         default = 100)
@@ -25,7 +25,7 @@ parser.add_argument("--part_num",           default = 3)
 parser.add_argument("--concept_type",       default = "box")
 parser.add_argument("--concept_dim",        default = 52)
 parser.add_argument("--object_dim",         default = 52)
-parser.add_argument("--temperature",        default = 0.002)
+parser.add_argument("--temperature",        default = 0.02)
 
 # box concept methods
 parser.add_argument("--method",             default = "uniform")
