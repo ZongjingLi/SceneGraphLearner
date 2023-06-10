@@ -354,3 +354,11 @@ def train_Archerus(train_model, config, args):
             sys.stdout.write ("\rEpoch: {}, Itrs: {} Loss: {} Percept:{} Language:{}, Time: {}".format(epoch + 1, itrs, working_loss,perception_loss,language_loss,datetime.timedelta(seconds=time.time() - start)))
         writer.add_scalar("epoch_loss", epoch_loss, epoch)
     print("\n\nExperiment {} : Training Completed.".format(args.name))
+
+
+def train_physic(model, config , args):
+
+    if args.dataset == "physica":
+        train_dataset = PhysicaDataset
+    if args.dataset == "industry":
+        train_dataset = 0

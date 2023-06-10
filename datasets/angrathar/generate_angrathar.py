@@ -158,14 +158,14 @@ class MyGame(arcade.Window):
 
         elif button == arcade.MOUSE_BUTTON_RIGHT:
             # With right mouse button, shoot a heavy coin fast.
-            mass = 200
-            radius = 20
+            mass = 99
+            radius = 10
             inertia = pymunk.moment_for_circle(mass, 0, radius, (0, 0))
             body = pymunk.Body(mass, inertia)
             body.position = x, y
-            body.velocity = 1500, 100
+            body.velocity = 100, 10
             shape = pymunk.Circle(body, radius, pymunk.Vec2d(0, 0))
-            shape.friction = 33.3
+            shape.friction = 11133.3
             self.space.add(body, shape)
 
             sprite = CircleSprite(shape, "assets/ims/ice.png")

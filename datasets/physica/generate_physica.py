@@ -87,7 +87,7 @@ class MyGame(arcade.Window):
         size = 32
 
         # Create the stacks of boxes
-
+        """
         for row in range(5):
             for column in range(4):
                 make_body(self, "crafting_table_gondolin_bottom.png",
@@ -96,20 +96,38 @@ class MyGame(arcade.Window):
 
         for row in range(5):
             for column in range(4):
-                make_body(self, "pillar1_pettyDwarf_side.png",
+                make_body(self, "wood_pillar1_laegrim_face.png",
                  500 + column* size,
-                  size * row + (floor_height + size / 2), friction = 100, mass =5000)
+                  size * row + (floor_height + size / 2), friction = 100, mass =500)
+        """
 
-        for row in range(5):
-            for column in range(4):
-                make_body(self, "crafting_table_brethil_bottom.png",
+        for row in range(8):
+            for column in range(3):
+                make_body(self, "crafting_table_gondolin_bottom.png",
                  700 + column* size,
                   size * row + (floor_height + size / 2), friction = 500, mass =1000)
 
-        make_body(self, "tol_in_gaurhoth_torch.png", 900, (floor_height + size / 2), mass = 100)
-        make_body(self, "tolingaurhoth_gate_base.png", 900, (floor_height + size / 2 * 5), mass = 5000, box_shape=(32 * 4,32 * 1))
-        make_body(self, "tolingaurhoth_gate_base.png", 900, (floor_height + size / 2 * 7), mass = 5000, box_shape=(32 * 4,32 * 1))
+        #make_body(self, "tol_in_gaurhoth_torch.png", 900, (floor_height + size / 2), mass = 100)
+        #make_body(self, "tolingaurhoth_gate_base.png", 900, (floor_height + size / 2 * 5), mass = 5000, box_shape=(32 * 4,32 * 1))
+        #make_body(self, "tolingaurhoth_gate_base.png", 900, (floor_height + size / 2 * 7), mass = 5000, box_shape=(32 * 4,32 * 1))
         
+        if True:
+            mass = 1500
+            radius = 20
+            inertia = pymunk.moment_for_circle(mass, 0, radius, (0, 0))
+            body = pymunk.Body(mass, inertia)
+            body.position = 300,300
+            body.velocity = 1500, 100
+            body.angular_velocity = 100
+            shape = pymunk.Poly.create_box(body, (32, 32))
+            #pymunk.Circle(body, radius, pymunk.Vec2d(0, 0))
+            shape.friction = 33.3
+            self.space.add(body, shape)
+
+            name = "crafting_table_brethil_bottom.png"
+
+            sprite = BoxSprite(shape, "/Users/melkor/Documents/datasets/PatchWork/{}".format(name), width=32, height=32)
+            self.sprite_list.append(sprite)
 
     def on_draw(self):
         """
@@ -158,17 +176,21 @@ class MyGame(arcade.Window):
 
         elif button == arcade.MOUSE_BUTTON_RIGHT:
             # With right mouse button, shoot a heavy coin fast.
-            mass = 200
+            mass = 1500
             radius = 20
             inertia = pymunk.moment_for_circle(mass, 0, radius, (0, 0))
             body = pymunk.Body(mass, inertia)
             body.position = x, y
             body.velocity = 1500, 100
-            shape = pymunk.Circle(body, radius, pymunk.Vec2d(0, 0))
+            body.angular_velocity = 100
+            shape = pymunk.Poly.create_box(body, (32, 32))
+            #pymunk.Circle(body, radius, pymunk.Vec2d(0, 0))
             shape.friction = 33.3
             self.space.add(body, shape)
 
-            sprite = CircleSprite(shape, "assets/ims/ice.png")
+            name = "crafting_table_brethil_bottom.png"
+
+            sprite = BoxSprite(shape, "/Users/melkor/Documents/datasets/PatchWork/{}".format(name), width=32, height=32)
             self.sprite_list.append(sprite)
 
     def on_mouse_release(self, x, y, button, modifiers):
@@ -187,6 +209,7 @@ class MyGame(arcade.Window):
         for sprite in self.sprite_list:
             x = sprite.pymunk_shape.position.x
             y = sprite.pymunk_shape.position.y
+            print(x,y,sprite)
 
     def on_key_press(self, symbol, modifiers):
         """Handle user keyboard input
