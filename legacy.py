@@ -359,6 +359,14 @@ def train_Archerus(train_model, config, args):
 def train_physic(model, config , args):
 
     if args.dataset == "physica":
-        train_dataset = PhysicaDataset
+        train_dataset = PhysicaDataset(config)
     if args.dataset == "industry":
-        train_dataset = 0
+        train_dataset = IndustryDataset(config)
+
+    dataloader = DataLoader(train_dataset, shuffle = True, batch_size = config.batch_size)
+
+    for epoch in range(config.epochs):
+        for sample in dataloader:
+            sample
+
+    print("\n\nExperiment {}: Physics Training Completed.".format(args.name))
