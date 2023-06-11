@@ -198,3 +198,38 @@ Here are some results collected in the scene from the paper. Results from this r
 
 ## Future Works
 This project contains.
+
+Checklist
+1. For all authors...
+(a) Do the main claims made in the abstract and introduction accurately reflect the paper’s
+contributions and scope? [Yes]
+(b) Did you describe the limitations of your work? [Yes] see Section 5.
+(c) Did you discuss any potential negative societal impacts of your work? [N/A]
+(d) Have you read the ethics review guidelines and ensured that your paper conforms to
+them? [Yes]
+2. If you are including theoretical results...
+(a) Did you state the full set of assumptions of all theoretical results? [N/A]
+(b) Did you include complete proofs of all theoretical results? [N/A]
+3. If you ran experiments...
+(a) Did you include the code, data, and instructions needed to reproduce the main experimental results (either in the supplemental material or as a URL)? [Yes] see the
+supplementary material.
+(b) Did you specify all the training details (e.g., data splits, hyperparameters, how they
+were chosen)? [Yes] see Section 3 and the supplementary material.
+(c) Did you report error bars (e.g., with respect to the random seed after running experiments multiple times)? [Yes] see the supplementary material.
+(d) Did you include the total amount of compute and the type of resources used (e.g., type
+of GPUs, internal cluster, or cloud provider)? [Yes] see the supplementary material.
+4. If you are using existing assets (e.g., code, data, models) or curating/releasing new assets...
+(a) If your work uses existing assets, did you cite the creators? [Yes]
+(b) Did you mention the license of the assets? [N/A] .
+(c) Did you include any new assets either in the supplemental material or as a URL? [N/A]
+(d) Did you discuss whether and how consent was obtained from people whose data you’re
+using/curating? [N/A]
+(e) Did you discuss whether the data you are using/curating contains personally identifiable
+information or offensive content? [N/A]
+5. If you used crowdsourcing or conducted research with human subjects...
+(a) Did you include the full text of instructions given to participants and screenshots, if
+applicable? [N/A]
+(b) Did you describe any potential participant risks, with links to Institutional Review
+Board (IRB) approvals, if applicable? [N/A]
+(c) Did you include the estimated hourly wage paid to participants and the total amount
+spent on participant compensation? [N/A]
