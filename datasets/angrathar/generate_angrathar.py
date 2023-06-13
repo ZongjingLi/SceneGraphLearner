@@ -98,7 +98,7 @@ class MyGame(arcade.Window):
             for column in range(4):
                 make_body(self, "pillar1_pettyDwarf_side.png",
                  500 + column* size,
-                  size * row + (floor_height + size / 2), friction = 100, mass =5000)
+                  size * row + (floor_height + size / 2), friction = 100, mass =15000)
 
         for row in range(5):
             for column in range(4):
@@ -158,12 +158,12 @@ class MyGame(arcade.Window):
 
         elif button == arcade.MOUSE_BUTTON_RIGHT:
             # With right mouse button, shoot a heavy coin fast.
-            mass = 99
-            radius = 10
+            mass = 999
+            radius = 20
             inertia = pymunk.moment_for_circle(mass, 0, radius, (0, 0))
             body = pymunk.Body(mass, inertia)
             body.position = x, y
-            body.velocity = 100, 10
+            body.velocity = 1000, 10
             shape = pymunk.Circle(body, radius, pymunk.Vec2d(0, 0))
             shape.friction = 11133.3
             self.space.add(body, shape)
