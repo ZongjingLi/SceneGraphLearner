@@ -158,14 +158,14 @@ class MyGame(arcade.Window):
 
         elif button == arcade.MOUSE_BUTTON_RIGHT:
             # With right mouse button, shoot a heavy coin fast.
-            mass = 999
+            mass = 999999999999999999999999999999
             radius = 20
             inertia = pymunk.moment_for_circle(mass, 0, radius, (0, 0))
             body = pymunk.Body(mass, inertia)
             body.position = x, y
             body.velocity = 1000, 10
             shape = pymunk.Circle(body, radius, pymunk.Vec2d(0, 0))
-            shape.friction = 11133.3
+            shape.friction = 999999999999999.1
             self.space.add(body, shape)
 
             sprite = CircleSprite(shape, "assets/ims/ice.png")
@@ -202,21 +202,21 @@ class MyGame(arcade.Window):
         if symbol == arcade.key.Q:
             # Quit immediately
             arcade.close_window()
-
+        step = 15
         if symbol == arcade.key.P:
             self.paused = not self.paused
 
         if symbol == arcade.key.I or symbol == arcade.key.UP:
-            self.graber_y += 5
+            self.graber_y += step
 
         if symbol == arcade.key.K or symbol == arcade.key.DOWN:
-            self.graber_y -= 5
+            self.graber_y -= step
 
         if symbol == arcade.key.J or symbol == arcade.key.LEFT:
-            self.graber_x -= 5
+            self.graber_x -= step
 
         if symbol == arcade.key.L or symbol == arcade.key.RIGHT:
-            self.graber_x += 5
+            self.graber_x += step
 
     def on_update(self, delta_time):
         start_time = timeit.default_timer()
