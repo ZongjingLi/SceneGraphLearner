@@ -116,8 +116,6 @@ class PSGNet(torch.nn.Module):
         self.rdn = RDN(SimpleNamespace(G0=node_feat_size  ,RDNkSize=3,n_colors=3,
                                RDNconfig=(4,3,16),scale=[2],no_upsampling=True))
 
-
-
         # Affinity modules: for now just one of P1 and P2 
         self.affinity_aggregations = torch.nn.ModuleList([])
         for s in struct:
