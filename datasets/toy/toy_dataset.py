@@ -23,7 +23,7 @@ class ToyData(Dataset):
         assert split in ["train","val","test"]
         self.split = split
         self.resolution = resolution
-        self.root_dir = "toy/images"
+        self.root_dir = root + "toy/images"
 
         self.img_transform = transforms.Compose(
             [transforms.ToTensor()]

@@ -5,7 +5,7 @@ import math
 
 SCREEN_WIDTH = 1800
 SCREEN_HEIGHT = 800
-SCREEN_TITLE = "Pymunk test"
+SCREEN_TITLE = "Shadows of Angrathar"
 
 
 class PhysicsSprite(arcade.Sprite):
