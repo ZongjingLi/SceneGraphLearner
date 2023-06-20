@@ -58,34 +58,3 @@ class ResidualBlock(nn.Module):
             x = self.shortcut(x)
 
         return self.relu(x+y)
-
-
-class KeyQueryProjection(nn.Module):
-    def __init__(self, input_dim, kq_dim, latent_dim, kernel_size=3, norm_fn='batch', downsample=True):
-        super(KeyQueryProjection, self).__init__()
-        self.conv = nn.Conv2d(input_dim, kq_dim, kernel_size=1, bias=True, padding='same')
-        self.key = nn.Sequential(
-            ResidualBlock(kq_dim, latent_dim, norm_fn, kernel_size=kernel_size, bias=False, stride=1, residual=True, downsample=downsample),
-            nn.Conv2d(latent_dim, kq_dim, kernel_size=1, bias=True, padding='same'))
-        self.query = nn.Sequential(
-            ResidualBlock(kq_dim, latent_dim, norm_fn, kernel_size=kernel_size, bias=False, stride=1, residual=True, downsample=downsample),
-            nn.Conv2d(latent_dim, kq_dim, kernel_size=1, bias=True, padding='same'))
-
-        for m in self.modules():
-            if isinstance(m, nn.Conv2d):
-                nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
-            elif isinstance(m, (nn.BatchNorm2d, nn.InstanceNorm2d, nn.GroupNorm)):
-                if m.weight is not None:
-                    nn.init.constant_(m.weight, 1)
-                if m.bias is not None:
-                    nn.init.constant_(m.bias, 0)
-
-    def forward(self, x):
-        # feature projection
-        feats = self.conv(x)  # [B, C, H, W]
-
-        # key & query projection
-        keys = self.key(feats)  # [B, C, H, W]
-        queries = self.query(feats)  # [B, C, H, W]
-
-        return keys, queries

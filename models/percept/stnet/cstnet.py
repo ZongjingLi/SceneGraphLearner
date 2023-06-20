@@ -1,4 +1,3 @@
-from tkinter.tix import Control
 from .stnet import *
 
 class ControlPSGNet(torch.nn.Module):
