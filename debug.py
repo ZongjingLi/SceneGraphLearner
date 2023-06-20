@@ -1,82 +1,44 @@
-
-from models import *
+from models.percept.construct_net import *
+from datasets import *
 from config import *
 
-from datasets import *
+# [Grid-Line Domain Diff]
+def lin2img(lin,b):return lin.reshape([b,128,128,3])
 
-import math
+test_dataset = SpriteData(split = "train")
+#test_dataset = ToyData(split = "train")
+dataloader = torch.utils.data.DataLoader(test_dataset, batch_size = 1, shuffle = True)
 
-dataset = ToyData("train")
+for sample in dataloader:
+    ims = sample["image"]
+    break;
 
-idx = [4, 7, 9, 11]
-ims = torch.cat([dataset[i]["image"].unsqueeze(0) for i in idx])
+construct_net = ConstructNet(config)
 
-print(ims.shape)
+outputs = construct_net(ims)
 
-percept = PSGNet(config.imsize,3)
+level_masks = outputs["masks"]
 
+for level in level_masks:
+    print(level.shape)
 
-outputs = percept(ims)
+base_mask = level_masks[0].reshape([10,128,128]).detach()
+print(base_mask.max())
 
-def normalize_outputs(outputs):
-    recons = outputs["recons"]
-    B = recons[0].shape[0]
-    W = int(math.sqrt(recons[0].shape[1]))
+for i in range(base_mask.shape[0]):
+    plt.subplot(1, 2, 1);plt.tick_params(left = False, right = False , labelleft = False ,
+                labelbottom = False, bottom = False);
+    plt.imshow(base_mask[i], cmap="bone")
+    plt.subplot(1, 2, 2);plt.tick_params(left = False, right = False , labelleft = False ,
+                labelbottom = False, bottom = False);
 
-    clusters = outputs["clusters"]
-
-    for item in clusters:print(item[0].shape, item[1].shape)
-
-    level_reconstructions = [item.reshape([B,W,W,3]) for item in recons]
-    level_scene_graphs  = []
-
-    return {"recons":level_reconstructions}
-
-outputs = normalize_outputs(outputs)
-recons = outputs["recons"]
-
-for i,item in enumerate(recons):print("level:{}".format(i),item.shape)
-
-import torch
-import torch.nn as nn
+    plt.imshow(base_mask[i].unsqueeze(-1) * ims[0])
+    plt.pause(0.01)
+plt.show()
 
 B = 1
-M = 20
-N = 8
-C = 64
 
-class AbstractNet(nn.Module):
-    def __init__(self,config):
-        super().__init__()
-        
-        self.num_heads =8
-        self.feature_decoder = nn.Transformer(nhead=16, num_encoder_layers=12,d_model = config.global_feature_dim,batch_first = True)
-        self.spatial_decoder = nn.Transformer(nhead=16, num_encoder_layers=12,d_model = config.global_feature_dim,batch_first = True)
-        self.source_heads = nn.Parameter(torch.randn([self.num_heads,config.global_feature_dim]))
-
-        self.coordinate_decoder = nn.Linear(config.global_feature_dim, 2)
-    
-    def forward(self, feature, spatial):
-        B, M, C = feature.shape
-        N = self.num_heads
-        # [Feature Propagation]
-        component_features = feature
-        component_spaitals = spatial
-
-        # [Decode Proposals]
-        global_feature = torch.randn()
-        source_heads = self.souce_heads
-        feature_proposals = self.feature_decoder(source_heads,global_feature)
-        spaital_proposals = self.spatial_decoder(source_heads,global_feature)
-
-        # [Component Matching]
-        # component_features : [B,M,C]
-        # feature_proposals  : [B,N,C]
-
-        match = torch.softmax(torch.einsum("bnc,bmc -> bnm",component_features, proposal_features)/math.sqrt(C), dim = -1)
-        existence = torch.max(match, dim = 1).values  # [B, N, 1]
-
-        # [Construct Representation]
-        output_graph = 0
-
-        return output_graph
+for b in range(B):
+    plt.subplot(1, B, b + 1);plt.tick_params(left = False, right = False , labelleft = False ,
+                labelbottom = False, bottom = False); plt.imshow(ims[b,:,:,:])
+plt.show()

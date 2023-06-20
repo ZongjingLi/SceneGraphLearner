@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
-
+import torch.nn.functional as F
+from torch_sparse import SparseTensor
 # may be we need a new graph propagation module
 
 class GraphPropagator(nn.Module):

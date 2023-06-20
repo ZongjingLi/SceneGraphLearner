@@ -13,6 +13,8 @@ from torch_geometric.data  import Data,Batch
 from torch_geometric.utils import grid, to_dense_batch
 from torch_scatter import scatter_mean,scatter_max
 
+from types import SimpleNamespace
+
 from .construct_quarter import *
 from .graph_propagation import *
 from .projection import *
@@ -51,6 +53,10 @@ def uniform_fully_connected(batch_size = 3, size = 30):
             for j in range(size // batch_size):full_edges.append([b * i,b * j])
     full_edges = torch.tensor(full_edges).t()
     return full_edges
+
+# [Scene Structure]
+
+
 
 class ConstructNet(nn.Module):
     def __init__(self, config):

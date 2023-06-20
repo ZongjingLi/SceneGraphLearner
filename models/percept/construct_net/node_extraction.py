@@ -2,7 +2,8 @@
 
 import numpy as np
 
-
+import torch
+import torch.nn as nn
 
 def sample_indices(batch, size, k_samples):
     max_index = size

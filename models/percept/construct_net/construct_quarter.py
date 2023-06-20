@@ -7,10 +7,58 @@ from torch_geometric.nn    import max_pool_x, GraphConv
 from torch_geometric.data  import Data,Batch
 from torch_geometric.utils import grid, to_dense_batch
 from torch_scatter import scatter_mean,scatter_max
+import torch_scatter
 
-from gcv import *
-from graph_propagation import *
-from node_extraction import *
+from .gcv import *
+from .graph_propagation import *
+from .node_extraction import *
+
+
+def to_base(indices, edges):
+    """
+    input:
+        indices: [K]
+        edges: [N,2]
+    outputs:
+        base_indices: [L]
+    """
+    base_indices = []
+    for i in range(edges.shape[0]): 
+        if (edges[i][0] in indices): base_indices.append(i)
+    return base_indices
+
+def location_in_node(scene, node):
+    return False
+
+class SceneStructure:
+    def __init__(self, graph, scores, from_base = None, base = None):
+        self.graph = graph
+        self.features = graph.x # [N, D]
+        self.scores   = scores # [N, 1]
+        self.edge_affinities = graph.edge_attr["weights"] #[N, N]
+        self.from_base = from_base # [2,N]: [[1, 3],[1, 1]]
+        self.base = base # Base Level Scene Structure
+    
+    def is_base(self): return self.from_base is None
+
+    def locate_in(self, pos, node_indices):return 0
+
+    def compute_masks(self, indices):
+         # input: indices of nodes that need to compute mask
+         # matrix form version.
+        nodes = to_base(indices, self.from_base)
+        if self.is_base():return self.scores[nodes]
+        return self.base.compute_masks(nodes)
+
+    def sparse_compute_masks(self, indices): 
+        # input: indices of nodes that need to compute mask
+        nodes = []
+        for a in self.from_base.permute([1,0]):
+            if a[1] in indices: nodes.append(a[0])
+        if self.is_base():
+            # this is the base level, just return the corresponding nodes
+            return self.scores[nodes]
+        return  self.base.compute_masks(nodes)
 
 # prototype for the construct quarter
 class ConstructQuarter(nn.Module):
