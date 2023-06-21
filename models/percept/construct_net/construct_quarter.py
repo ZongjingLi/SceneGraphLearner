@@ -73,7 +73,7 @@ class ConstructQuarter(nn.Module):
         self.q_conv = GCNConv(in_feat_size, out_feat_size)
 
         # [Graph Propagation] create the Graph Propgation Module
-        self.graph_propagator = GraphPropagator(num_iters = 25)
+        self.graph_propagator = GraphPropagator(num_iters = 60)
         # GraphPropagator(num_iters = 7)
 
         # [Node Extraction]

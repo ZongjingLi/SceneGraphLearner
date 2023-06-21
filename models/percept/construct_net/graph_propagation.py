@@ -60,9 +60,10 @@ class GraphPropagator(nn.Module):
                  num_iters=15,
                  excite=True,
                  inhibit=True,
-                 project=False,
-                 adj_thresh=0.5):
+                 project=True,
+                 adj_thresh=0.65):
         super().__init__()
+        num_iters = 75
         self.num_iters = num_iters
         self.excite = excite
         self.inhibit = inhibit

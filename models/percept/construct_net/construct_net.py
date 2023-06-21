@@ -28,11 +28,17 @@ def build_perception(size,length,device):
         for j in range(size):
             # go for all the points on the grid
             coord = [i,j];loc = i * size + j
+            
+            for r in range(25):
+                random_long_range = torch.randint(128, (1,2) )[0]
+                #edges[0].append(random_long_range[0] // size)
+                #edges[1].append(random_long_range[1] % size)
             for dx in range(-length,length+1):
                 for dy in range(-length,length+1):
                     if i+dx < size and i+dx>=0 and j+dy<size and j+dy>=0:
-                        edges[0].append(loc)
-                        edges[1].append( (i+dx) * size + (j + dy))
+                        if (i+dx) * size + (j + dy) != loc:
+                            edges[0].append(loc)
+                            edges[1].append( (i+dx) * size + (j + dy))
     return torch.tensor(edges).to(device)
 
 def sample_indices(batch, size, k_samples):
@@ -57,7 +63,6 @@ def uniform_fully_connected(batch_size = 3, size = 30):
 # [Scene Structure]
 
 
-
 class ConstructNet(nn.Module):
     def __init__(self, config):
         super().__init__()
@@ -65,12 +70,12 @@ class ConstructNet(nn.Module):
         device = config.device
         # construct the grid domain connection
         self.imsize = config.imsize
-        self.perception_size = 5#config.perception_size
+        self.perception_size = 7 #config.perception_size
         # build the connection graph for the grid domain
         spatial_edges, self.spatial_coords = grid(self.imsize,self.imsize,device=device)
         self.spatial_edges =  build_perception(self.imsize,self.perception_size,device = device)
     
-        node_feat_size = 64
+        node_feat_size = 128
         # [Grid Convolution]
         self.grid_convs =RDN(SimpleNamespace(G0=node_feat_size  ,RDNkSize=3,n_colors=3,
                                RDNconfig=(4,3,16),scale=[2],no_upsampling=True))
