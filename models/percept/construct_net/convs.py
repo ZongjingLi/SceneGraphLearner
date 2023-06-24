@@ -7,7 +7,7 @@ class RDB_Conv(nn.Module):
         G  = growRate
         self.conv = nn.Sequential(*[
             nn.Conv2d(Cin, G, kSize, padding=(kSize-1)//2, stride=1),
-            nn.ReLU()
+            nn.ReLU(),
         ])
 
     def forward(self, x):

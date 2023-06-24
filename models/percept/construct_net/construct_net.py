@@ -61,7 +61,12 @@ def uniform_fully_connected(batch_size = 3, size = 30):
     return full_edges
 
 # [Scene Structure]
+import math
 
+def softmax_max_norm(x):
+    x = x.softmax(-1)
+    x = x / torch.max(x, dim=-1, keepdim=True)[0].clamp(min=1e-12)# .detach()
+    return x
 
 class ConstructNet(nn.Module):
     def __init__(self, config):
@@ -70,12 +75,12 @@ class ConstructNet(nn.Module):
         device = config.device
         # construct the grid domain connection
         self.imsize = config.imsize
-        self.perception_size = 7 #config.perception_size
+        self.perception_size = config.perception_size
         # build the connection graph for the grid domain
         spatial_edges, self.spatial_coords = grid(self.imsize,self.imsize,device=device)
         self.spatial_edges =  build_perception(self.imsize,self.perception_size,device = device)
     
-        node_feat_size = 128
+        node_feat_size = config.node_feat_dim
         # [Grid Convolution]
         self.grid_convs =RDN(SimpleNamespace(G0=node_feat_size  ,RDNkSize=3,n_colors=3,
                                RDNconfig=(4,3,16),scale=[2],no_upsampling=True))
@@ -96,9 +101,9 @@ class ConstructNet(nn.Module):
             nn.Conv2d(latent_dim, kq_dim, kernel_size=1, bias=True, padding='same'))
 
         # [Construct Quarters]
-        construct_config = (10,5)
+        construct_config = (config.imsize ** 2,10,5)
         self.construct_quarters = nn.ModuleList(
-            [ConstructQuarter(node_feat_size, node_feat_size, k) for k in construct_config]
+            [ConstructQuarter(node_feat_size, node_feat_size, construct_config[i+1], construct_config[i]) for i in range(len(construct_config) - 1)]
         )
 
         self.verbose = 0
@@ -120,13 +125,20 @@ class ConstructNet(nn.Module):
         decode_ks = self.k_convs(im_feats).flatten(2,3).permute(0,2,1)
         decode_qs = self.q_convs(im_feats).flatten(2,3).permute(0,2,1)
 
-        weights = torch.einsum("bnd,bnd->bn",
-            decode_ks[:,edges[0,:],:],decode_qs[:,edges[1,:],:],
-            )
-        #print(weights.max(), weights.min())
+        #decode_ks = im_feats.flatten(2,3).permute(0,2,1)
+        #decode_qs = im_feats.flatten(2,3).permute(0,2,1)
+
+        #weights = torch.einsum("bnd,bnd->bn",
+        #    decode_ks[:,edges[0,:],:],decode_qs[:,edges[1,:],:],
+        #    )
+        
+        weights = torch.cosine_similarity(decode_ks[:,edges[0,:],:] , decode_qs[:,edges[1,:],:], dim =-1)
+        #weights = torch.matmul(decode_qs[:,edges[0,:],:], decode_ks[:,edges[1,:],:].permute(0, 2, 1))
+
         #weights = torch_scatter.scatter_softmax(weights, edges[1,:]) # softmax((Wfi).(Wfj))
-        weights = torch.sigmoid((weights))
-        #weights = weights / torch.max(weights,edges[1,:])
+        weights = softmax_max_norm(weights)
+        #print(weights.max(), weights.min())
+        #print(weights.shape)
         # TODO: scatter normalize the graph weight
 
         # [Base Graph] construct the initial spatial-augumented graph input        
@@ -151,16 +163,18 @@ class ConstructNet(nn.Module):
         curr_scene = base_scene_structure
         from_base = True
         level_masks = []
+        level_index = []
+        level_features = []
         if self.verbose:
             print("scene construction::\n")
         for construct_quarter in self.construct_quarters:
             construct_counter +=1
             if self.verbose:
                 print("construct quarter {}:".format(construct_counter))
-            curr_scene, masks = construct_quarter(curr_scene, from_base)
+            curr_scene, masks, raw_features ,sample_index = construct_quarter(curr_scene, from_base)
             from_base = False
-            level_masks.append(masks)
+            level_masks.append(masks); level_index.append(sample_index); level_features.append(raw_features)
             # load the abstract graph information
             if self.verbose:
                 print("")
-        return {"gt_im":ims, "masks":level_masks}
+        return {"gt_im":ims, "masks":level_masks, "level_index": level_index, "level_features":level_features}

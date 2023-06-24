@@ -5,6 +5,17 @@ import numpy as np
 import torch
 import torch.nn as nn
 
+def uniform_fully_connected(batch_size = 3, size = 30):
+    assert size % batch_size == 0, print("full size cannot be batchify")
+    full_edges = []
+    for b in range(batch_size):
+        for i in range(size // batch_size):
+            for j in range(size // batch_size):full_edges.append([b * i,b * j])
+    full_edges = torch.tensor(full_edges).t()
+    return full_edges
+
+# [Node Extraction]
+
 def sample_indices(batch, size, k_samples):
     max_index = size
     sample_index = []
@@ -43,26 +54,20 @@ class NodeExtraction(nn.Module):
         node_features = state #[N,D]
         batch_size = scene.graph.batch.max() + 1
 
-        #print(batch_size)
         sample_index, index_batch = sample_indices(batch_size, size = self.grid_size, k_samples = self.k_nodes)
         
         batch_node_mask = []
         for b in range(batch_size):
-            #print(b)
             sample_features = node_features[sample_index[self.k_nodes*b: self.k_nodes*(b+1)]]
-            #print("location_feature_heads: ", sample_features.shape)
-            #print("node_features:", node_features.shape)
-            #masks = torch.einsum("nd,md->nm", sample_features, node_features)
-            #print(sample_features.shape, node_features.shape)
-            print(torch.matmul(sample_features, node_features.permute(1,0)).max(),torch.matmul(sample_features, node_features.permute(1,0)).min())
             masks = torch.sigmoid(
-                (torch.matmul(sample_features, node_features.permute(1,0)) - 0.25) / 0.02
+                (torch.matmul(sample_features, node_features.permute(1,0)) - 0.2) / 0.02
                 ) 
             # mask out components out of the batch
             for b_ in range(batch_size):
                 if b != b:masks[self.k_nodes*b_: self.k_nodes*(b_+1), :] *= 0.0
-            print("max:{} min:{}".format(masks.max(), masks.min()))
+
             batch_node_mask.append(masks)
-            #print("masks:",masks.shape)
+
         batch_node_mask = torch.cat(batch_node_mask, dim = 1)
-        return batch_node_mask, index_batch
+        return batch_node_mask,index_batch,node_features, sample_index
+        return {"batch_node_mask": batch_node_mask, "batch_index": index_batch,"raw_features":node_features, "sample_index":sample_index}

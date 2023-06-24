@@ -30,6 +30,11 @@ def to_base(indices, edges):
 def location_in_node(scene, node):
     return False
 
+def softmax_max_norm(x):
+    x = x.softmax(-1)
+    x = x / torch.max(x, dim=-1, keepdim=True)[0].clamp(min=1e-12)# .detach()
+    return x
+
 class SceneStructure:
     def __init__(self, graph, scores, from_base = None, base = None):
         self.graph = graph
@@ -61,8 +66,9 @@ class SceneStructure:
         return  self.base.compute_masks(nodes)
 
 # prototype for the construct quarter
+# prototype for the construct quarter
 class ConstructQuarter(nn.Module):
-    def __init__(self, in_feat_size, out_feat_size, k_nodes = 5):
+    def __init__(self, in_feat_size, out_feat_size, k_nodes = 5, grid_size = 128 * 128):
         super().__init__()
         # [Graph Convolution] for the input data
         self.graph_conv = GCNConv(in_feat_size, out_feat_size)
@@ -73,11 +79,11 @@ class ConstructQuarter(nn.Module):
         self.q_conv = GCNConv(in_feat_size, out_feat_size)
 
         # [Graph Propagation] create the Graph Propgation Module
-        self.graph_propagator = GraphPropagator(num_iters = 60)
+        self.graph_propagator = GraphPropagator(num_iters = 75,project=True,adj_thresh = 0.5)
         # GraphPropagator(num_iters = 7)
 
         # [Node Extraction]
-        self.node_extractor = NodeExtraction(k_nodes = k_nodes, grid_size = k_nodes)
+        self.node_extractor = NodeExtraction(k_nodes = k_nodes, grid_size = grid_size)
         
     def forward(self, scene, from_base = False, verbose = False):
         # abstract the input graph data
@@ -106,10 +112,7 @@ class ConstructQuarter(nn.Module):
             weights = torch.cosine_similarity(
             decode_ks[edge_index[0,:],:],decode_qs[edge_index[1,:],:],
              dim = -1)
-
-            weights = torch_scatter.scatter_softmax(weights, edge_index[1,:]) # softmax((Wfi).(Wfj))
-            #weights = torch.sigmoid(weights)
-            weights = weights / torch.max(weights,edge_index[1,:])
+            weights = softmax_max_norm(weights)
             if verbose:
                 print("start the Graph Convolution")
                 print(abstract_features.shape)        
@@ -124,8 +127,6 @@ class ConstructQuarter(nn.Module):
             prop_features = self.graph_propagator(random_init_state, edge_index, edge_weights)
         else:
             B = batch_size; N = random_init_state.shape[0]
-            #adjs = torch.zeros([B,N,N])
-            #adjs[0,edge_index[0,:], edge_index[1,:]] = edge_weights
             random_init_state = random_init_state.unsqueeze(0)
             sparse_size = (N,N)
             adjs = SparseTensor(row=edge_index[0,:].long(),col=edge_index[1,:].long(),value=edge_weights,sparse_sizes=sparse_size)
@@ -136,7 +137,8 @@ class ConstructQuarter(nn.Module):
         
         # [Extract Nodes]
         # region competition and constuct the nodes at each level.
-        masks_extracted, masks_batch = self.node_extractor(prop_features, scene)
+        node_outputs = self.node_extractor(prop_features, scene)
+        masks_extracted, masks_batch, raw_features, sample_index = node_outputs #["batch_node_masks"], node_outputs["batch_index"], node_outputs["sample_index"]
         masks_extracted = torch.tensor(masks_extracted)
         if verbose:
             print(abstract_features.shape, masks_extracted.shape)
@@ -148,7 +150,6 @@ class ConstructQuarter(nn.Module):
             print("  node_features:", node_features.shape)
             print("  node_scores:", node_scores.shape)
         # TODO: a more complicated node extraction
-        print("abstract_node_features:",node_features.shape)
     
         output_graph = Batch.from_data_list([Data(node_features, edge_attr={"weights":None})])
         output_graph.batch = torch.tensor(masks_batch)
@@ -156,4 +157,4 @@ class ConstructQuarter(nn.Module):
         # [Build Abstracted Scene] 
         abstract_scene = SceneStructure(output_graph, node_scores, False, scene)
 
-        return abstract_scene, masks_extracted
+        return abstract_scene, masks_extracted, raw_features, sample_index

@@ -229,6 +229,6 @@ class GraphPropagator(nn.Module):
 
     @staticmethod
     def _relu_norm(x, relu=True, norm=True, eps=1e-16):
-        x = F.relu(x) if relu else x
+        x = F.celu(x) if relu else x
         x = F.normalize(x + eps, p=2.0, dim=-1, eps=max([eps, 1e-12])) if norm else x
         return x
