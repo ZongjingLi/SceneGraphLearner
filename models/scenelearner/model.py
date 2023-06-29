@@ -14,6 +14,7 @@ class SceneLearner(nn.Module):
     def __init__(self,config):
         super().__init__()
         self.config = config
+        print("using perception:",config.perception)
         # [Unsupervised Part-Centric Representation]
         if config.perception == "psgnet":
             self.scene_perception = SceneGraphNet(config)

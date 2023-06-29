@@ -59,7 +59,7 @@ def train(model, config, args):
     query = True if args.training_mode in ["joint", "query"] else False
     print("\nstart the experiment: {} query:[{}]".format(args.name,query))
     print("experiment config: \nepoch: {} \nbatch: {} samples \nlr: {}\n".format(args.epoch,args.batch_size,args.lr))
-    
+    B = args.batch_size
     #[setup the training and validation dataset]
     if args.dataset == "ptr":
         train_dataset = PTRData("train", resolution = config.resolution)
@@ -105,8 +105,10 @@ def train(model, config, args):
             gt_ims = torch.tensor(sample["image"].numpy()).float().to(config.device)
 
             outputs = model.scene_perception(gt_ims)
-            recons, clusters, all_losses = outputs["recons"],outputs["clusters"],outputs["losses"]
-
+            try:
+                recons, clusters, all_losses = outputs["recons"],outputs["clusters"],outputs["losses"]
+            except:
+                clusters = torch.ones([B,128,128,1]); recons = torch.randn([B,5,128,128,3]); all_losses = {}
 
             perception_loss = 0
 
@@ -241,6 +243,7 @@ def train_Archerus(train_model, config, args):
     concept_visualizer = ConceptEmbeddingVisualizer(0, writer)
 
     for epoch in range(args.epoch):
+        B = args.batch_size
         epoch_loss = 0
         for sample in dataloader:
             
@@ -250,8 +253,11 @@ def train_Archerus(train_model, config, args):
             outputs = train_model.scene_perception(gt_ims)
 
             # get the components
-            recons, clusters, all_losses = outputs["recons"],outputs["clusters"],outputs["losses"]
-            
+            try:
+                recons, clusters, all_losses = outputs["recons"],outputs["clusters"],outputs["losses"]
+            except:
+                clusters = torch.ones([B,128,128,1]); recons = torch.randn([B,5,128,128,3]); all_losses = {}
+
             masks    = outputs["abstract_scene"][-1]["masks"].permute([0,3,1,2]).unsqueeze(-1)
             scores   = outputs["abstract_scene"][-1]["scores"][0,...] - EPS
             scores   = torch.clamp(scores, min = EPS, max = 1)
@@ -261,7 +267,7 @@ def train_Archerus(train_model, config, args):
 
 
             for i,pred_img in enumerate(recons[:]):
-                perception_loss += torch.nn.functional.l1_loss(pred_img.flatten(), gt_ims.flatten())
+                pass#perception_loss += torch.nn.functional.l1_loss(pred_img.flatten(), gt_ims.flatten())
 
             # [language query module training]
             language_loss = 0

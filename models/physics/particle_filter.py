@@ -10,8 +10,8 @@ import pycocotools.mask as mask_util
 from multiprocessing import Pool, cpu_count
 from tqdm import tqdm
 
-import pybullet as p
-import pybullet_data
+#import pybullet as p
+#import pybullet_data
 import numpy as np
 
 from utils import * 

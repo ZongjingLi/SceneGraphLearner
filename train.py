@@ -245,31 +245,25 @@ argparser.add_argument("--effective_level",         default = 1)
 
 # [checkpoint location and savings]
 argparser.add_argument("--checkpoint_dir",          default = False)
-argparser.add_argument("--checkpoint_itrs",         default = 50)
+argparser.add_argument("--checkpoint_itrs",         default = 10)
 argparser.add_argument("--pretrain_perception",     default = False)
 
 args = argparser.parse_args()
+
+config.perception = args.perception
+print(config.perception)
 
 if args.checkpoint_dir:
     model = torch.load(args.checkpoint_dir, map_location = config.device)
 else:
     print("No checkpoint to load and creating a new model instance")
-    if args.name == "TBC":
-        config.perception = "slot_attention"
-        model = SceneLearner(config)
     if args.name == "Acherus":
         config.perception = "psgnet"
         model = SceneLearner(config)
     if args.name == "Elbon" or "PTR":
         config.domain = "toy"
         print("Elbon Blade Training Set")
-        config.perception = "psgnet"
         args.dataset = "Elbon"
-        model = SceneLearner(config)
-    if args.name == "Valkyr":
-        config.perception = "local_psgnet"
-        args.dataset = "Elbon"
-        print("Init the Local Scene Graph Net")
         model = SceneLearner(config)
     if args.name == "Sprites":
         config.domain = "sprites"
@@ -281,27 +275,39 @@ if args.pretrain_perception:
 
 #model = torch.load("checkpoints/TBC_joint_toy_slot_attention.ckpt", map_location=args.device)
 #model.scene_perception.slot_attention.iters = 10
-print(args.name)
+
+def build_perception(size,length,device):
+    edges = [[],[]]
+    for i in range(size):
+        for j in range(size):
+            # go for all the points on the grid
+            coord = [i,j];loc = i * size + j
+            
+            for r in range(5):
+                random_long_range = torch.randint(128, (1,2) )[0]
+                edges[0].append(random_long_range[0] // size)
+                edges[1].append(random_long_range[1] % size)
+            for dx in range(-length,length+1):
+                for dy in range(-length,length+1):
+                    if i+dx < size and i+dx>=0 and j+dy<size and j+dy>=0:
+                        if 1 and (i+dx) * size + (j + dy) != loc:
+                            edges[0].append(loc)
+                            edges[1].append( (i+dx) * size + (j + dy))
+    return torch.tensor(edges).to(device)
+
 if args.name == "Sprites":
     print("Val'kyr start the training session.")
     train_Archerus(model, config, args)
 
-if args.name == "Valkyr":
-    print("Val'kyr start the training session.")
-    args.dataset = "Acherus"
-    train_Valkyr(model, config, args)
-
-if args.name == "TBC":
-    train_TBC(model, config, args)
 elif args.name == "Acherus":
     print("Assault on New Avalon")
     config.perception = args.perception
     train_Archerus(model, config, args)
+
 elif args.name == "Elbon" or "PTR":
     print("The Elbon Blade")
     args.dataset = "toy"
-    if args.name == "PTR":
-        args.dataset = "ptr"
-    config.perception = "psgnet"
+    if args.name == "PTR":args.dataset = "ptr"
+    config.perception = args.perception
     train_Archerus(model, config, args)
 

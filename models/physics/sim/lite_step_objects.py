@@ -1,5 +1,5 @@
-import pybullet as p
-import pybullet_data
+#import pybullet as p
+#import pybullet_data
 import os
 from utils.geometry import reverse_euler, reverse_xyz
 

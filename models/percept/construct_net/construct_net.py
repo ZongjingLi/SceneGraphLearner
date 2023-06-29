@@ -101,7 +101,7 @@ class ConstructNet(nn.Module):
             nn.Conv2d(latent_dim, kq_dim, kernel_size=1, bias=True, padding='same'))
 
         # [Construct Quarters]
-        construct_config = (config.imsize ** 2,10,5)
+        construct_config = (config.imsize ** 2,10)#,5)
         self.construct_quarters = nn.ModuleList(
             [ConstructQuarter(node_feat_size, node_feat_size, construct_config[i+1], construct_config[i]) for i in range(len(construct_config) - 1)]
         )
@@ -154,7 +154,6 @@ class ConstructNet(nn.Module):
             if from_base:
                 im_mask = masks.reshape([B,P,128,128]).detach()
             else:
-                print(masks.shape)
                 masks = torch.chunk(masks,B,0)
                 masks = torch.cat([m.unsqueeze(0) for m in masks], dim = 0)
                 im_mask = torch.einsum("bnm,bmwh->bnwh",masks,scene[-1]["masks"] )

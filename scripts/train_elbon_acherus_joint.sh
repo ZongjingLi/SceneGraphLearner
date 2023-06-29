@@ -1,1 +1,1 @@
-/Users/melkor/miniforge3/envs/Melkor/bin/python train.py --name="Elbon" --training_mode="joint" 
+/Users/melkor/miniforge3/envs/Melkor/bin/python train.py --name="Elbon" --perception="psgnet" --training_mode="joint" 
