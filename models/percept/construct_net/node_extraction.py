@@ -35,6 +35,9 @@ def uniform_fully_connected(batch_size = 3, size = 30):
     full_edges = torch.tensor(full_edges).t()
     return full_edges
 
+def jacard_index(seg1, seg2):
+    return torch.min(seg1, seg2).sum(-1) / torch.max(seg1, seg2).sum(-1)
+
 # [Node Extraction]
 
 class NodeExtraction(nn.Module):

@@ -14,6 +14,7 @@ for sample in dataloader:
     ims = sample["image"]
     break;
 
+
 def build_perception(size,length,device):
     edges = [[],[]]
     for i in range(size):
@@ -21,7 +22,7 @@ def build_perception(size,length,device):
             # go for all the points on the grid
             coord = [i,j];loc = i * size + j
             
-            for r in range(10):
+            for r in range(25):
                 random_long_range = torch.randint(128, (1,2) )[0]
                 edges[0].append(random_long_range[0] // size)
                 edges[1].append(random_long_range[1] % size)
