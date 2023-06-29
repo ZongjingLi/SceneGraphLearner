@@ -110,11 +110,9 @@ class ConstructNet(nn.Module):
 
     def forward(self, ims):
         # flatten the image-feature and add it with the coordinate information
+        device = "cuda:0" if torch.cuda.is_available() else "cpu"
         B, W, H, C = ims.shape
-        if self.verbose:
-            print("input_image:\n  {}x{}x{}x{} #BxWxHxC".format(*list(ims.shape)))
         im_feats = self.grid_convs(ims.permute([0,3,1,2])) # [B,D,W,H]
-        #im_feats = ims.permute([0,3,1,2])
 
         # [Image Grid Convolution]
         coords_added_im_feats = im_feats.flatten(2,3).permute(0,2,1) # 【B, N, D】
@@ -124,35 +122,14 @@ class ConstructNet(nn.Module):
         edges = self.spatial_edges
         decode_ks = self.k_convs(im_feats).flatten(2,3).permute(0,2,1)
         decode_qs = self.q_convs(im_feats).flatten(2,3).permute(0,2,1)
-
-        #decode_ks = im_feats.flatten(2,3).permute(0,2,1)
-        #decode_qs = im_feats.flatten(2,3).permute(0,2,1)
-
-        #weights = torch.einsum("bnd,bnd->bn",
-        #    decode_ks[:,edges[0,:],:],decode_qs[:,edges[1,:],:],
-        #    )
         
         weights = torch.cosine_similarity(decode_ks[:,edges[0,:],:] , decode_qs[:,edges[1,:],:], dim =-1)
-        #weights = torch.matmul(decode_qs[:,edges[0,:],:], decode_ks[:,edges[1,:],:].permute(0, 2, 1))
-
-        #weights = torch_scatter.scatter_softmax(weights, edges[1,:]) # softmax((Wfi).(Wfj))
         weights = softmax_max_norm(weights)
-        #print(weights.max(), weights.min())
-        #print(weights.shape)
-        # TODO: scatter normalize the graph weight
 
         # [Base Graph] construct the initial spatial-augumented graph input        
         graph_in = Batch.from_data_list([
             Data(coords_added_im_feats[i], self.spatial_edges, edge_attr = {"weights":weights[i]})
                                                 for i in range(B)])
-
-        if self.verbose:
-            print("input_graph:\n x: {}x{} #NxD \n  batch: {} bn:{}\n  edge_indices: {}x{}\n  edge_weight: {}".format(
-                *list(graph_in.x.shape), *list(graph_in.batch.shape), graph_in.batch.max()+1,
-                *list(graph_in.edge_index.shape), *list(graph_in.edge_attr["weights"].shape)
-                ))
-            print("  weight specs: max:{} min:{}".format(graph_in.edge_attr["weights"].max(), graph_in.edge_attr["weights"].min()))
-
         # [Construct Quarter] 
         # create the abstracted graph at each level and construct the scene parse tree
         input_graph = graph_in
@@ -160,21 +137,33 @@ class ConstructNet(nn.Module):
         # base level scene structure
         base_scene_structure = SceneStructure(input_graph,\
             scores = torch.ones(weights.shape), from_base = None, base = None)
+
         curr_scene = base_scene_structure
         from_base = True
         level_masks = []
         level_index = []
         level_features = []
+        scene = []
         if self.verbose:
             print("scene construction::\n")
         for construct_quarter in self.construct_quarters:
             construct_counter +=1
-            if self.verbose:
-                print("construct quarter {}:".format(construct_counter))
+            P = construct_quarter.k_nodes # K nodes in the construction level
             curr_scene, masks, raw_features ,sample_index = construct_quarter(curr_scene, from_base)
-            from_base = False
             level_masks.append(masks); level_index.append(sample_index); level_features.append(raw_features)
+            if from_base:
+                im_mask = masks.reshape([B,P,128,128]).detach()
+            else:
+                print(masks.shape)
+                masks = torch.chunk(masks,B,0)
+                masks = torch.cat([m.unsqueeze(0) for m in masks], dim = 0)
+                im_mask = torch.einsum("bnm,bmwh->bnwh",masks,scene[-1]["masks"] )
+            
+            construct_scene = {"scores":torch.ones(B,P,1).to(device),"features":raw_features,"masks":im_mask,"match":False}
+
+            scene.append(construct_scene)
+            from_base = False
             # load the abstract graph information
-            if self.verbose:
-                print("")
-        return {"gt_im":ims, "masks":level_masks, "level_index": level_index, "level_features":level_features}
+        
+        return {"gt_im":ims, "masks":level_masks, "level_index": level_index, "level_features":level_features
+        ,"abstract_scene":scene}

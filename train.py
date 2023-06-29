@@ -227,6 +227,7 @@ argparser.add_argument("--batch_size",              default = 1)
 argparser.add_argument("--dataset",                 default = "toy")
 
 # [perception and language grounding training]
+argparser.add_argument("--perception",              default = "psgnet")
 argparser.add_argument("--training_mode",           default = "joint")
 argparser.add_argument("--alpha",                   default = 10.00)
 argparser.add_argument("--beta",                    default = 0.001)
@@ -294,7 +295,7 @@ if args.name == "TBC":
     train_TBC(model, config, args)
 elif args.name == "Acherus":
     print("Assault on New Avalon")
-    config.perception = "psgnet"
+    config.perception = args.perception
     train_Archerus(model, config, args)
 elif args.name == "Elbon" or "PTR":
     print("The Elbon Blade")

@@ -73,6 +73,7 @@ class ConstructQuarter(nn.Module):
         # [Graph Convolution] for the input data
         self.graph_conv = GCNConv(in_feat_size, out_feat_size)
         self.location_itrs = k_nodes
+        self.k_nodes = k_nodes
 
         # [Affinity Decoder] softversion of graph constructer
         self.k_conv = GCNConv(in_feat_size, out_feat_size)
