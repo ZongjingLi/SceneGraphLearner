@@ -21,7 +21,7 @@ parser.add_argument("--resolution",         default = (128,128))
 parser.add_argument("--hidden_dim",         default = 100)
 parser.add_argument("--node_feat_dim",      default = 32 * 2)
 
-parser.add_argument("--object_num",         default = 5)
+parser.add_argument("--object_num",         default = 10)
 parser.add_argument("--part_num",           default = 3)
 
 # setup the concept learner 

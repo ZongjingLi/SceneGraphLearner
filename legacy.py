@@ -267,7 +267,7 @@ def train_Archerus(train_model, config, args):
 
 
             for i,pred_img in enumerate(recons[:]):
-                pass#perception_loss += torch.nn.functional.l1_loss(pred_img.flatten(), gt_ims.flatten())
+                perception_loss += torch.nn.functional.l1_loss(pred_img.flatten(), gt_ims.flatten())
 
             # [language query module training]
             language_loss = 0
