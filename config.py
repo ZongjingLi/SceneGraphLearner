@@ -15,7 +15,7 @@ parser.add_argument("--domain",             default = "toy")
 
 # setup the perception module
 parser.add_argument("--perception",         default = "valkyr")
-parser.add_argument("--perception_size",    default = 5)
+parser.add_argument("--perception_size",    default = 3)
 parser.add_argument("--imsize",             default = 128)
 parser.add_argument("--resolution",         default = (128,128))
 parser.add_argument("--hidden_dim",         default = 100)

@@ -222,7 +222,7 @@ argparser.add_argument("--device",                  default = config.device)
 argparser.add_argument("--name",                    default = "KFT")
 argparser.add_argument("--epoch",                   default = 400)
 argparser.add_argument("--optimizer",               default = "Adam")
-argparser.add_argument("--lr",                      default = 1e-3)
+argparser.add_argument("--lr",                      default = 2e-4)
 argparser.add_argument("--batch_size",              default = 1)
 argparser.add_argument("--dataset",                 default = "toy")
 
@@ -283,7 +283,7 @@ def build_perception(size,length,device):
             # go for all the points on the grid
             coord = [i,j];loc = i * size + j
             
-            for r in range(5):
+            for r in range(1):
                 random_long_range = torch.randint(128, (1,2) )[0]
                 edges[0].append(random_long_range[0] // size)
                 edges[1].append(random_long_range[1] % size)

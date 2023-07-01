@@ -265,7 +265,6 @@ def train_Archerus(train_model, config, args):
 
             perception_loss = 0
 
-
             for i,pred_img in enumerate(recons[:]):
                 perception_loss += torch.nn.functional.l1_loss(pred_img.flatten(), gt_ims.flatten())
 
