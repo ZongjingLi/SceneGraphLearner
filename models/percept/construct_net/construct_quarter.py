@@ -81,7 +81,7 @@ class ConstructQuarter(nn.Module):
         self.q_conv = GCNConv(in_feat_size, out_feat_size)
 
         # [Graph Propagation] create the Graph Propgation Module
-        self.graph_propagator = GraphPropagator(num_iters = 55,project=False,adj_thresh = 0.5)
+        self.graph_propagator = GraphPropagator(num_iters = 25,project=False,adj_thresh = 0.5)
         # GraphPropagator(num_iters = 7)
 
         # [Node Extraction]
@@ -110,7 +110,7 @@ class ConstructQuarter(nn.Module):
         # [Propagate]
         # perform propagation over the continuous label on the graph 
         sparse_size = (B*N, B*N)
-        Q = 64
+        Q = 128
         random_init_state = torch.randn([B,N,Q]) # random initialize labels : [B,N,D]
         # [B,N,D]   [B,2,n']    [B,n']
         rows = []; cols = []; ws = [];

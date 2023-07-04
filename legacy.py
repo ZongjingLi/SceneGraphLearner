@@ -293,7 +293,7 @@ def train_Archerus(train_model, config, args):
                         features = top_level_scene["features"][b].reshape([scores.shape[0],-1])
 
 
-                        edge = 1e-6
+                        edge = 1e-5
                         if config.concept_type == "box":
                             features = torch.cat([features,edge * torch.ones(features.shape)],-1)#.unsqueeze(0)
 
@@ -355,7 +355,8 @@ def train_Archerus(train_model, config, args):
                 visualize_image_grid(gt_ims[0].cpu().detach(), row = 1, save_name = "val_gt_image")
 
                 # * gt_ims
-                single_comps =  torchvision.utils.make_grid((masks )[0:1].cpu().detach().permute([0,1,4,2,3]).flatten(start_dim = 0, end_dim = 1),normalize=True,nrow=num_slots).permute(1,2,0)
+
+                single_comps =  torchvision.utils.make_grid((masks ).unsqueeze(-1)[0:1].cpu().detach().permute([0,1,4,2,3]).flatten(start_dim = 0, end_dim = 1),normalize=True,nrow=num_slots).permute(1,2,0)
                 visualize_image_grid(single_comps.cpu().detach(), row = 1, save_name = "slot_masks")
                 #visualize_psg(gt_ims[0:1].cpu().detach(), outputs["abstract_scene"], args.effective_level)
 

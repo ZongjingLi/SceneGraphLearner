@@ -29,7 +29,7 @@ def build_perception(size,length,device):
             # go for all the points on the grid
             coord = [i,j];loc = i * size + j
             
-            for r in range(25):
+            for r in range(1):
                 random_long_range = torch.randint(128, (1,2) )[0]
                 #edges[0].append(random_long_range[0] // size)
                 #edges[1].append(random_long_range[1] % size)
@@ -74,7 +74,7 @@ class ConstructNet(nn.Module):
         device = config.device
         # construct the grid domain connection
         self.imsize = config.imsize
-        self.perception_size = 7#config.perception_size
+        self.perception_size = config.perception_size
         # build the connection graph for the grid domain
         spatial_edges, self.spatial_coords = grid(self.imsize,self.imsize,device=device)
         self.spatial_edges =  build_perception(self.imsize,self.perception_size,device = device)
@@ -97,7 +97,7 @@ class ConstructNet(nn.Module):
             nn.Conv2d(latent_dim, kq_dim, kernel_size=1, bias=True, padding='same'))
 
         # [Construct Quarters]
-        construct_config = (128*128, 8)
+        construct_config = (128*128, 6)
         self.construct_quarters = nn.ModuleList(
             [ConstructQuarter(node_feat_size, node_feat_size, construct_config[i+1], construct_config[i]) for i in range(len(construct_config) - 1)]
         )
@@ -118,7 +118,7 @@ class ConstructNet(nn.Module):
         decode_ks = self.k_convs(im_feats).flatten(2,3).permute(0,2,1)
         decode_qs = self.q_convs(im_feats).flatten(2,3).permute(0,2,1)
 
-        weights = torch.cosine_similarity(decode_ks[:,edges[0,:],:] , decode_qs[:,edges[1,:],:], dim =-1) * 1.0
+        weights = torch.cosine_similarity(decode_ks[:,edges[0,:],:] , decode_qs[:,edges[1,:],:], dim =-1)# * (C ** -0.5) 
         weights = softmax_max_norm(weights)
         edges = self.spatial_edges.unsqueeze(0).repeat(B,1,1)
         #print("weights_shape:{} max:{} min:{}".format(weights.shape, weights.max(), weights.min()))
