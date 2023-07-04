@@ -241,6 +241,7 @@ def train_Archerus(train_model, config, args):
     writer = SummaryWriter(events_dir)
 
     concept_visualizer = ConceptEmbeddingVisualizer(0, writer)
+    recon_flag = False;
 
     for epoch in range(args.epoch):
         B = args.batch_size
@@ -257,16 +258,19 @@ def train_Archerus(train_model, config, args):
                 recons, clusters, all_losses = outputs["recons"],outputs["clusters"],outputs["losses"]
             except:
                 clusters = torch.ones([B,128,128,1]); recons = torch.randn([B,5,128,128,3]); all_losses = {}
+            masks = outputs["abstract_scene"][-1]["masks"]
+            scores = outputs["abstract_scene"][-1]["scores"]
 
-            masks    = outputs["abstract_scene"][-1]["masks"].permute([0,3,1,2]).unsqueeze(-1)
-            scores   = outputs["abstract_scene"][-1]["scores"][0,...] - EPS
+            #masks    = outputs["abstract_scene"][-1]["masks"].permute([0,3,1,2]).unsqueeze(-1)
+            #scores   = outputs["abstract_scene"][-1]["scores"][0,...] - EPS
             scores   = torch.clamp(scores, min = EPS, max = 1)
             #print(scores)
 
             perception_loss = 0
 
-            for i,pred_img in enumerate(recons[:]):
-                perception_loss += torch.nn.functional.l1_loss(pred_img.flatten(), gt_ims.flatten())
+            if recon_flag:
+                for i,pred_img in enumerate(recons[:]):
+                    perception_loss += torch.nn.functional.l1_loss(pred_img.flatten(), gt_ims.flatten())
 
             # [language query module training]
             language_loss = 0
@@ -282,11 +286,10 @@ def train_Archerus(train_model, config, args):
 
                         working_scene = [top_level_scene]
 
-                        scores   = top_level_scene["scores"][b,...] - EPS
+                        scores   = scores = outputs["abstract_scene"][-1]["scores"]
                         scores   = torch.clamp(scores, min = EPS, max = 1).reshape([-1])
 
                         #scores = scores.unsqueeze(0)
-
                         features = top_level_scene["features"][b].reshape([scores.shape[0],-1])
 
 
@@ -343,8 +346,10 @@ def train_Archerus(train_model, config, args):
                 name = args.name
                 expr = args.training_mode
                 num_slots = masks.shape[1]
-                torch.save(train_model, "checkpoints/{}_{}_{}_{}.ckpt".format(name,expr,config.domain,config.perception))
-                log_imgs(config.imsize,pred_img.cpu().detach(), clusters, gt_ims.reshape([args.batch_size,config.imsize ** 2,3]).cpu().detach(),writer,itrs)
+                torch.save(train_model.state_dict(), "checkpoints/{}_{}_{}_{}.pth".format(name,expr,config.domain,config.perception))
+                
+
+                #log_imgs(config.imsize,pred_img.cpu().detach(), clusters, gt_ims.reshape([args.batch_size,config.imsize ** 2,3]).cpu().detach(),writer,itrs)
                 
                 visualize_image_grid(gt_ims.flatten(start_dim = 0, end_dim = 1).cpu().detach(), row = args.batch_size, save_name = "ptr_gt_perception")
                 visualize_image_grid(gt_ims[0].cpu().detach(), row = 1, save_name = "val_gt_image")

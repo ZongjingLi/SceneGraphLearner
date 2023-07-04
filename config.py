@@ -26,8 +26,8 @@ parser.add_argument("--part_num",           default = 3)
 
 # setup the concept learner 
 parser.add_argument("--concept_type",       default = "box")
-parser.add_argument("--concept_dim",        default = 100)
-parser.add_argument("--object_dim",         default = 100)
+parser.add_argument("--concept_dim",        default = 64)
+parser.add_argument("--object_dim",         default = 64)
 parser.add_argument("--temperature",        default = 0.2)
 
 # box concept methods

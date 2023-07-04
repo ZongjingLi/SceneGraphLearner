@@ -7,13 +7,12 @@ def lin2img(lin,b):return lin.reshape([b,128,128,3])
 
 test_dataset = SpriteData(split = "train")
 test_dataset = ToyData(split = "train")
-test_dataset = AcherusDataset(split = "train")
-dataloader = torch.utils.data.DataLoader(test_dataset, batch_size = 1, shuffle = False)
+#test_dataset = AcherusDataset(split = "train")
+dataloader = torch.utils.data.DataLoader(test_dataset, batch_size = 1, shuffle = True)
 
 for sample in dataloader:
     ims = sample["image"]
     break;
-
 
 def build_perception(size,length,device):
     edges = [[],[]]
@@ -38,41 +37,30 @@ construct_net = ConstructNet(config)
 
 outputs = construct_net(ims)
 
+abstract_scene = outputs["abstract_scene"][-1]
+level_masks = abstract_scene["masks"]
 
-level_masks = outputs["masks"]
-level_index = outputs["level_index"]
-level_inds = outputs["level_index"]
-level_features = outputs["level_features"]
-
-for level in level_masks:print(level.shape)
-
-for idx in level_index:print(idx)
-
-for feat in level_features:print(feat.shape)
-
-
-base_locs = level_index[0]
-base_mask = level_masks[0].reshape([10,128,128]).detach()
+print(level_masks.shape)
+base_mask = level_masks.detach()
 print(base_mask.max())
 
-for i in range(base_mask.shape[0]):
+b = 0
+for i in range(base_mask.shape[1]):
     plt.subplot(1, 2, 1);plt.tick_params(left = False, right = False , labelleft = False ,
                 labelbottom = False, bottom = False);
-    plt.imshow(base_mask[i], cmap="bone")
+    plt.imshow(base_mask[b,i], cmap="bone")
     plt.subplot(1, 2, 2);plt.tick_params(left = False, right = False , labelleft = False ,
                 labelbottom = False, bottom = False);
 
-    plt.imshow(base_mask[i].unsqueeze(-1) * ims[0])
-    bx = base_locs[i] / 128
-    by = base_locs[i] % 128
-    plt.scatter(bx,by)
+    plt.imshow(base_mask[b,i].unsqueeze(-1) * ims[0])
+    #bx = base_locs[i] / 128
+    #by = base_locs[i] % 128
+    #plt.scatter(bx,by)
     plt.pause(0.5)
 plt.show()
 
 B = 1
-
 for b in range(B):
     plt.subplot(1, B, b + 1);plt.tick_params(left = False, right = False , labelleft = False ,
                 labelbottom = False, bottom = False); plt.imshow(ims[b,:,:,:])
-    plt.pause(0.5)
 plt.show()

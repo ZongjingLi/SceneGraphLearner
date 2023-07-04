@@ -65,97 +65,77 @@ class SceneStructure:
             return self.scores[nodes]
         return  self.base.compute_masks(nodes)
 
-# prototype for the construct quarter
+
+
 # prototype for the construct quarter
 class ConstructQuarter(nn.Module):
     def __init__(self, in_feat_size, out_feat_size, k_nodes = 5, grid_size = 128 * 128):
         super().__init__()
+        self.device = "cuda:0" if torch.cuda.is_available() else "cpu"
         # [Graph Convolution] for the input data
         self.graph_conv = GCNConv(in_feat_size, out_feat_size)
         self.location_itrs = k_nodes
-        self.k_nodes = k_nodes
 
         # [Affinity Decoder] softversion of graph constructer
         self.k_conv = GCNConv(in_feat_size, out_feat_size)
         self.q_conv = GCNConv(in_feat_size, out_feat_size)
 
         # [Graph Propagation] create the Graph Propgation Module
-        self.graph_propagator = GraphPropagator(num_iters = 75,project=True,adj_thresh = 0.5)
+        self.graph_propagator = GraphPropagator(num_iters = 55,project=False,adj_thresh = 0.5)
         # GraphPropagator(num_iters = 7)
 
         # [Node Extraction]
-        self.node_extractor = NodeExtraction(k_nodes = k_nodes, grid_size = grid_size)
+        self.node_extractor = Competition(num_masks = k_nodes - 1)
+        #NodeExtraction(k_nodes = k_nodes, grid_size = grid_size)
         
-    def forward(self, scene, from_base = False, verbose = False):
+    def forward(self, node_features, node_edges = None, node_weights = None):
         # abstract the input graph data
-        if from_base:
-            # do not compute affinity graph
-            input_graph = scene.graph
-            x = input_graph.x
-            edge_index = input_graph.edge_index
-            edge_weights = input_graph.edge_attr["weights"]
-            batch_size = input_graph.batch.max() + 1
-            abstract_features = x
-        else:
+        B,N,D = node_features.shape
+        if node_edges is None:
             # need an extra step to build edges and decode affinities
             # [Abstract]
-            input_graph = scene.graph
-            x = input_graph.x
-            batch_size = input_graph.batch.max() + 1
-            edge_index = uniform_fully_connected(batch_size, size = scene.graph.x.shape[0])
+            edge_index = uniform_fully_connected(B, size = B)
             abstract_features = self.graph_conv(x, edge_index)
 
             # [Constructe Affinities]
             decode_ks = self.k_conv(x, edge_index)
             decode_qs = self.q_conv(x, edge_index)
             # build affinities
-            if verbose:print(decode_ks.shape)
-            weights = torch.cosine_similarity(
-            decode_ks[edge_index[0,:],:],decode_qs[edge_index[1,:],:],
-             dim = -1)
-            weights = softmax_max_norm(weights)
-            if verbose:
-                print("start the Graph Convolution")
-                print(abstract_features.shape)        
-            edge_weights = weights
-        
+            weights = torch.cosine_similarity(decode_ks[:,edges[0,:],:] , decode_qs[:,edges[1,:],:], dim =-1)
+            node__weights = softmax_max_norm(weights)
+
         # After this stage, {edge_index} ,{edge_weights} should be available
+        # torch.Size([3, 16384, 64]) torch.Size([3, 2, 434724]) torch.Size([3, 434724])
 
         # [Propagate]
-        # perform propagation over the continuous label on the graph
-        random_init_state = torch.randn(x.shape) # random initialize labels
-        if 0:
-            prop_features = self.graph_propagator(random_init_state, edge_index, edge_weights)
-        else:
-            B = batch_size; N = random_init_state.shape[0]
-            random_init_state = random_init_state.unsqueeze(0)
-            sparse_size = (N,N)
-            adjs = SparseTensor(row=edge_index[0,:].long(),col=edge_index[1,:].long(),value=edge_weights,sparse_sizes=sparse_size)
-            prop_features = self.graph_propagator(random_init_state, adjs)[0,:,:]
-        if verbose:
-            print("start the Graph Propagation")
-            print("prop_features:",prop_features.shape)
-        
+        # perform propagation over the continuous label on the graph 
+        sparse_size = (B*N, B*N)
+        Q = 64
+        random_init_state = torch.randn([B,N,Q]) # random initialize labels : [B,N,D]
+        # [B,N,D]   [B,2,n']    [B,n']
+        rows = []; cols = []; ws = [];
+        for b in range(B):rows.append(node_edges[b,0,:].long());cols.append(node_edges[b,1,:].long());ws.append(node_weights[b,:])
+        rows = torch.cat(rows, dim = -1); cols = torch.cat(cols, dim = -1); ws = torch.cat(ws, dim = -1)
+        adjs = SparseTensor(row=rows,\
+                            col=cols,\
+                            value=ws,
+                            sparse_sizes=sparse_size)
+        prop_features = self.graph_propagator(random_init_state, adjs) # [B,N,Q]
+        W,H = 128,128
+
+        platmap = prop_features.reshape([B,W,H,Q])
         # [Extract Nodes]
         # region competition and constuct the nodes at each level.
-        node_outputs = self.node_extractor(prop_features, scene)
-        masks_extracted, masks_batch, raw_features, sample_index = node_outputs #["batch_node_masks"], node_outputs["batch_index"], node_outputs["sample_index"]
-        masks_extracted = torch.tensor(masks_extracted)
-        if verbose:
-            print(abstract_features.shape, masks_extracted.shape)
-        node_features = torch.einsum("nd,mn->md",abstract_features, masks_extracted)
-        node_scores = torch.max(masks_extracted, dim = -1).values
-        if verbose:
-            print("start the Node Extraction")
-            print("  masks_extracted:", masks_extracted.shape)
-            print("  node_features:", node_features.shape)
-            print("  node_scores:", node_scores.shape)
-        # TODO: a more complicated node extraction
-    
-        output_graph = Batch.from_data_list([Data(node_features, edge_attr={"weights":None})])
-        output_graph.batch = torch.tensor(masks_batch)
+        masks, agents, alive, pheno, unharv = self.node_extractor(platmap)
+        masks_extracted = torch.cat([masks, unharv], dim = -1).permute([0,3,1,2])
 
-        # [Build Abstracted Scene] 
-        abstract_scene = SceneStructure(output_graph, node_scores, False, scene)
+        #masks_extracted = self.node_extractor(prop_features)
+        # B,M,N #["batch_node_masks"], node_outputs["batch_index"], node_outputs["sample_index"]
+        B,N,_,_ = masks_extracted.shape
+        node_features = torch.einsum("bnd,bmn->bmd",node_features, masks_extracted.reshape([B,N,W*H]))
+        node_features = F.normalize(node_features, p=2, dim=1, eps=1e-12, out=None)
 
-        return abstract_scene, masks_extracted, raw_features, sample_index
+        node_scores = torch.max(torch.max(masks_extracted, dim = -1).values, dim = -1).values
+
+        # node_features, node_masks, node_scores
+        return node_features, masks_extracted, node_scores

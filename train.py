@@ -295,6 +295,7 @@ def build_perception(size,length,device):
                             edges[1].append( (i+dx) * size + (j + dy))
     return torch.tensor(edges).to(device)
 
+
 if args.name == "Sprites":
     print("Val'kyr start the training session.")
     train_Archerus(model, config, args)

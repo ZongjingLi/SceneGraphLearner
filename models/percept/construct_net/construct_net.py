@@ -62,12 +62,11 @@ def uniform_fully_connected(batch_size = 3, size = 30):
 
 # [Scene Structure]
 import math
-
 def softmax_max_norm(x):
     x = x.softmax(-1)
     x = x / torch.max(x, dim=-1, keepdim=True)[0].clamp(min=1e-12)# .detach()
     return x
-
+    
 class ConstructNet(nn.Module):
     def __init__(self, config):
         super().__init__()
@@ -75,15 +74,14 @@ class ConstructNet(nn.Module):
         device = config.device
         # construct the grid domain connection
         self.imsize = config.imsize
-        self.perception_size = config.perception_size
+        self.perception_size = 7#config.perception_size
         # build the connection graph for the grid domain
         spatial_edges, self.spatial_coords = grid(self.imsize,self.imsize,device=device)
         self.spatial_edges =  build_perception(self.imsize,self.perception_size,device = device)
     
         node_feat_size = config.node_feat_dim
         # [Grid Convolution]
-        self.grid_convs =RDN(SimpleNamespace(G0=node_feat_size  ,RDNkSize=3,n_colors=3,
-                               RDNconfig=(4,3,16),scale=[2],no_upsampling=True))
+        self.grid_convs =RDN(SimpleNamespace(G0=node_feat_size  ,RDNkSize=3,n_colors=3,RDNconfig=(4,3,16),scale=[2],no_upsampling=True))
         
         # [Affinity Decoder]
         kq_dim = node_feat_size
@@ -91,78 +89,53 @@ class ConstructNet(nn.Module):
         norm_fn = "batch"
         kernel_size = 3
         downsample = False
-        self.k_convs = \
-        nn.Sequential(
+        self.k_convs = nn.Sequential(
             ResidualBlock(kq_dim, latent_dim, norm_fn, kernel_size=kernel_size, bias=False, stride=1, residual=True, downsample=downsample),
             nn.Conv2d(latent_dim, kq_dim, kernel_size=1, bias=True, padding='same'))
-        self.q_convs = \
-        nn.Sequential(
+        self.q_convs = nn.Sequential(
             ResidualBlock(kq_dim, latent_dim, norm_fn, kernel_size=kernel_size, bias=False, stride=1, residual=True, downsample=downsample),
             nn.Conv2d(latent_dim, kq_dim, kernel_size=1, bias=True, padding='same'))
 
         # [Construct Quarters]
-        construct_config = (config.imsize ** 2,10)#,5)
+        construct_config = (128*128, 8)
         self.construct_quarters = nn.ModuleList(
             [ConstructQuarter(node_feat_size, node_feat_size, construct_config[i+1], construct_config[i]) for i in range(len(construct_config) - 1)]
         )
 
         self.verbose = 0
-
+        self.device = "cuda:0" if torch.cuda.is_available() else "cpu"
     def forward(self, ims):
         # flatten the image-feature and add it with the coordinate information
-        device = "cuda:0" if torch.cuda.is_available() else "cpu"
         B, W, H, C = ims.shape
         im_feats = self.grid_convs(ims.permute([0,3,1,2])) # [B,D,W,H]
 
         # [Image Grid Convolution]
-        coords_added_im_feats = im_feats.flatten(2,3).permute(0,2,1) # 【B, N, D】
-        weights = torch.ones(self.spatial_edges.shape[1]) # []
+        coords_added_im_feats = im_feats.flatten(2,3).permute(0,2,1); # 【B, N, D】
+
 
         # [Affinity Decoder](base)
         edges = self.spatial_edges
         decode_ks = self.k_convs(im_feats).flatten(2,3).permute(0,2,1)
         decode_qs = self.q_convs(im_feats).flatten(2,3).permute(0,2,1)
-        
-        weights = torch.cosine_similarity(decode_ks[:,edges[0,:],:] , decode_qs[:,edges[1,:],:], dim =-1)
+
+        weights = torch.cosine_similarity(decode_ks[:,edges[0,:],:] , decode_qs[:,edges[1,:],:], dim =-1) * 1.0
         weights = softmax_max_norm(weights)
-
+        edges = self.spatial_edges.unsqueeze(0).repeat(B,1,1)
+        #print("weights_shape:{} max:{} min:{}".format(weights.shape, weights.max(), weights.min()))
         # [Base Graph] construct the initial spatial-augumented graph input        
-        graph_in = Batch.from_data_list([
-            Data(coords_added_im_feats[i], self.spatial_edges, edge_attr = {"weights":weights[i]})
-                                                for i in range(B)])
+
         # [Construct Quarter] 
+        node_features = coords_added_im_feats; P = node_features.shape[1]; 
+        construct_scene = [{"scores":torch.ones(B,P,1).to(self.device),"features":node_features,"masks":1.0,"match":False}]
         # create the abstracted graph at each level and construct the scene parse tree
-        input_graph = graph_in
-        construct_counter = 0
-        # base level scene structure
-        base_scene_structure = SceneStructure(input_graph,\
-            scores = torch.ones(weights.shape), from_base = None, base = None)
+        for i,construct_quarter in enumerate(self.construct_quarters):
+            # input to construct quarter: edges[B,2,N] weights [B,N]
+            if i == 0: node_features, node_masks, node_scores = construct_quarter(node_features, edges, weights)
+            else: node_features, node_masks, node_scores = construct_quarter(node_features)
+            # output of construct quarter: nodes(feature): [B,M,D] masks: [B,M,d^2]
+            # scores of each mask can be calculated as s = max(Mask)
+            abstract_scene = {"scores":node_scores,"features":node_features,"masks":node_masks,"match":False}
+            construct_scene.append(abstract_scene)
+    
 
-        curr_scene = base_scene_structure
-        from_base = True
-        level_masks = []
-        level_index = []
-        level_features = []
-        scene = []
-        if self.verbose:
-            print("scene construction::\n")
-        for construct_quarter in self.construct_quarters:
-            construct_counter +=1
-            P = construct_quarter.k_nodes # K nodes in the construction level
-            curr_scene, masks, raw_features ,sample_index = construct_quarter(curr_scene, from_base)
-            level_masks.append(masks); level_index.append(sample_index); level_features.append(raw_features)
-            if from_base:
-                im_mask = masks.reshape([B,P,128,128]).detach()
-            else:
-                masks = torch.chunk(masks,B,0)
-                masks = torch.cat([m.unsqueeze(0) for m in masks], dim = 0)
-                im_mask = torch.einsum("bnm,bmwh->bnwh",masks,scene[-1]["masks"] )
-            
-            construct_scene = {"scores":torch.ones(B,P,1).to(device),"features":raw_features,"masks":im_mask,"match":False}
-
-            scene.append(construct_scene)
-            from_base = False
-            # load the abstract graph information
-        
-        return {"gt_im":ims, "masks":level_masks, "level_index": level_index, "level_features":level_features
-        ,"abstract_scene":scene}
+        return {"gt_im":ims, "abstract_scene":construct_scene}
