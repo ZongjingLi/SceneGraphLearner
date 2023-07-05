@@ -159,7 +159,6 @@ class Competition(nn.Module):
         ## sample initial indices ("agents") from borders of the plateau map
         agents = sample_coordinates_at_borders(
             plateau.permute(0, 3, 1, 2), num_points=self.M, mask=None, sum_edges=self.sum_edges)
-
         ## initially all of these agents are "alive"
         alive = torch.ones_like(agents[..., -1:])  # [BT,M,1]
 
@@ -169,7 +168,7 @@ class Competition(nn.Module):
 
         ## the "fitness" of an agent -- how likely it is to survive competition --
         ## is how well its phenotype matches the plateau vector at its current position
-
+        
 
         fitnesses = compute_compatibility(agents, plateau, phenotypes, availability=None, noise=0.1)
 
@@ -207,8 +206,10 @@ class Competition(nn.Module):
                 fitnesses)
 
             ## recompute the masks
+
             occupied_regions = self.sg_phenotypes_func(
                 soft_index(plateau.permute(0, 3, 1, 2), agents, scale_by_imsize=True))
+
             masks_pred = masks_from_phenotypes(plateau, occupied_regions, normalize=True)  # [BT,N,M]
 
             ## have each pair of agents compete.
@@ -247,7 +248,7 @@ class Competition(nn.Module):
             loser_phenotypes = self.normalization_func(
                 compute_distance_weighted_vectors(plateau, agents, mask=unharvested, beta=self.homing_strength))
             phenotypes = alive_mask * phenotypes + (1.0 - alive_mask) * loser_phenotypes
-            phenotypes = self.normalization_func(phenotypes)
+            phenotypes = self.normalization_func(phenotypes)  
 
         ## run a final competition between the surviving masks
         if self.mask_beta is not None:
@@ -301,8 +302,9 @@ def dot_product_attention(queries, keys, normalize=True, eps=1e-8):
     if normalize:
         queries = F.normalize(queries, p=2.0, dim=-1, eps=eps)
         keys = F.normalize(keys, p=2.0, dim=-1, eps=eps)
+    eps = 1e-6
 
-    outputs = torch.matmul(queries, torch.transpose(keys, 1, 2))  # [B, N, N_k]
+    outputs = torch.matmul(queries, torch.transpose(keys, 1, 2)).relu() + eps  # [B, N, N_k]
     attention = torch.transpose(outputs, 1, 2)  # [B, N_k, N]
 
     return outputs
@@ -312,7 +314,8 @@ def sample_image_inds_from_probs(probs, num_points, eps=1e-8):
     B, H, W = probs.shape
     P = num_points
     N = H * W
-
+    
+    probs = torch.ones_like(probs)
     probs = probs.reshape(B, N)
 
     probs = torch.maximum(probs + eps, torch.tensor(0.).to(probs)) / (probs.sum(dim=-1, keepdim=True) + eps)
@@ -365,10 +368,11 @@ def sample_coordinates_at_borders(image, num_points=16, mask=None, sum_edges=Tru
         edges = edges * mask[:, 0]
 
     coordinates = sample_image_inds_from_probs(edges, num_points=num_points)
+
     if normalized_coordinates:
         coordinates = coordinates.float()
-        coordinates /= torch.tensor([H - 1, W - 1], dtype=torch.float32).to(coordinates)[None, None]
-        coordinates = 2.0 * coordinates - 1.0
+        coordinates /= torch.tensor([H , W ], dtype=torch.float32).to(coordinates)[None, None]
+        coordinates = 2.0 * coordinates - 0.0
     return coordinates
 
 
@@ -574,11 +578,12 @@ def compute_distance_weighted_vectors(vector_map, positions, mask=None, beta=1.0
 def masks_from_phenotypes(plateau, phenotypes, normalize=True):
     B, H, W, Q = plateau.shape
     N = H * W
+    
     masks = dot_product_attention(
         queries=plateau.view(B, N, Q),
         keys=phenotypes,
         normalize=normalize)
-    masks_ = masks
+    masks_ = 1 * (masks)
     return masks_
 
 

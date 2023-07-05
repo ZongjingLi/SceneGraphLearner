@@ -992,8 +992,8 @@ if __name__ == "__main__":
     competition = Competition(num_masks = 6)
     B,W,H,Q = (2,128,128,32)
     platmap = torch.zeros([B,W,H,Q])
-    platmap[0,30:70,40:80,:] = torch.ones([1,40,40,Q])
-    platmap[1,40:80,60:100,:] = torch.ones([1,40,40,Q])
+    #platmap[0,30:70,40:80,:] = torch.ones([1,40,40,Q])
+    #platmap[1,40:80,60:100,:] = torch.ones([1,40,40,Q])
 
     masks, agents, alive, pheno, unharv = competition(platmap)
 

@@ -17,6 +17,7 @@ from models.percept.stnet.propagation import GraphPropagation
 from .convnet               import *
 from .affinities            import *
 from .primary               import * 
+from .competition           import *
 from utils                  import *
 
 import math
@@ -315,12 +316,14 @@ class SceneGraphLevel(nn.Module):
 
         node_feat_size = in_dim
         self.graph_conv = GraphConv(node_feat_size , node_feat_size ,aggr = "mean") 
+        self.node_extractor = Competition(num_masks = num_slots - 1)
 
     def forward(self,inputs):
         in_features = inputs["features"]
         in_scores = inputs["scores"]
         B, N, C = in_scores.shape[0],in_scores.shape[1],in_features.shape[-1]
 
+        """
 
         raw_spatials = in_features[-2:]
 
@@ -353,117 +356,19 @@ class SceneGraphLevel(nn.Module):
 
         in_masks = inputs["masks"]
         out_masks = torch.einsum("bwhm,bmn->bwhn",in_masks,match)
-
-
-
-        return {"features":out_features,"scores":out_scores, "masks":out_masks, "match":match}
-
-class LocalSceneGraphLevel(nn.Module):
-    def __init__(self, num_slots,config):
-        super().__init__()
-        iters = 10
-        in_dim = config.object_dim
-        self.layer_embedding = nn.Parameter(torch.randn(num_slots, in_dim))
-        self.constuct_quarter = SlotAttention(num_slots,in_dim = in_dim,slot_dim = in_dim, iters = 5)
-        self.hermit = nn.Linear(config.object_dim,in_dim)
-        self.outward = nn.Linear(in_dim,in_dim, bias = False)
-        self.propagator = GraphPropagation(num_iters = iters)
-
-        node_feat_size = in_dim
-        self.graph_conv = GraphConv(node_feat_size , node_feat_size ,aggr = "mean") 
-
-    def forward(self,inputs):
-        in_features = inputs["features"]
-        in_scores = inputs["scores"]
-        B, N, C = in_scores.shape[0],in_scores.shape[1],in_features.shape[-1]
-
-
-        raw_spatials = in_features[-2:]
-
-
-
-        if False:
-            construct_features, construct_attn = self.connstruct_quarter(in_features)
-            # [B,N,C]
-        else:
-            construct_features, construct_attn = in_features, in_scores
-        construct_features[-2:] = 1 * construct_features[-2:]
-        construct_features[:-2] = construct_features[:-2]/math.sqrt(C)
-
-
-        proposal_features = self.layer_embedding.unsqueeze(0).repeat(B,1,1)
-
-        match = torch.softmax(in_scores * torch.einsum("bnc,bmc -> bnm",in_features, proposal_features)/0.02, dim = -1)
-
-        out_features = torch.einsum("bnc,bnm->bmc",construct_features, match)
-        #out_features = self.outward(out_features)
-
-        out_scores = torch.max(match, dim = 1).values.unsqueeze(-1)
+        """
+        in_features = in_features
+        #print(in_features.shape)
+        masks, agents, alive, pheno, unharv = self.node_extractor(in_features.unsqueeze(1))
+        match= torch.cat([masks, unharv], dim = -1).squeeze(1)
 
         in_masks = inputs["masks"]
         out_masks = torch.einsum("bwhm,bmn->bwhn",in_masks,match)
 
+        out_scores = torch.max(match, dim = 1).values
+        out_features = torch.einsum("bnc,bnm->bmc",in_features, match)
 
-
-        return {"features":out_features,"scores":out_scores, "masks":out_masks, "match":match}
-
-
-class LocalSceneGraphNet(nn.Module):
-    def __init__(self, config):
-        super().__init__()
-        self.backbone = PSGNet(config.imsize, config.perception_size, config.object_dim - 2 )
-        self.scene_graph_levels = nn.ModuleList([
-            LocalSceneGraphLevel(5, config)
-        ])
-
-    def forward(self, ims):
-        # [PSGNet as the Backbone]
-        B,W,H,C = ims.shape
-        primary_scene = self.backbone(ims)
-        psg_features = primary_scene
-
-        print(psg_features["features"][-1].shape)
-        print(psg_features["centroids"][-1].shape)
-
-        base_features = torch.cat([
-            psg_features["features"][-1],
-            psg_features["centroids"][-1],
-        ],dim = -1)
-        B = psg_features["features"][-1].shape[0]
-        P = psg_features["features"][-1].shape[1]
-
-        # [Compute the Base Mask]
-        clusters = primary_scene["clusters"][-1]
-        print(len(clusters))
-
-        local_masks = []
-        for i in range(len(clusters)):
-            cluster_r = clusters[i][0];
-            for cluster_j,batch_j in reversed(clusters[:i]):
-                cluster_r = cluster_r[cluster_j].unsqueeze(0).reshape([B,W,H])
-
-                local_masks.append(cluster_r)
-
-        K = int(cluster_r.max()) + 1 # Cluster size
-        local_masks = torch.zeros([B,W,H,K])
-        
-        for k in range(K):
-            #local_masks[cluster_r] = 1
-            local_masks[:,:,:,k] = torch.where(k == cluster_r,1,0)
-
-        # [Construct the Base Level]
-        base_scene = {"scores":torch.ones(B,P,1),"features":base_features,"masks":local_masks,"match":False}
-        abstract_scene = [base_scene]
-
-        # [Construct the Scene Level]
-        for merger in self.scene_graph_levels:
-            construct_scene = merger(abstract_scene[-1])
-            abstract_scene.append(construct_scene)
-
-        primary_scene["abstract_scene"] = abstract_scene
-
-        return primary_scene
-
+        return {"features":out_features,"scores":out_scores, "masks":out_masks, "match":masks}
 
 
 class SceneGraphNet(nn.Module):
