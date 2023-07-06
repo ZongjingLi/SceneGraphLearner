@@ -31,6 +31,7 @@ def generate_local_indices(img_size, K, padding='constant'):
 class EisenNet(nn.Module):
     def __init__(self, config):
         super().__init__()
+        device = "cuda:0" if torch.cuda.is_available() else "cpu"
         affinity_res=[128, 128]
         kq_dim = 32
         supervision_level = 3
@@ -39,12 +40,14 @@ class EisenNet(nn.Module):
         subsample_affinity=True,
         eval_full_affinity=False,
         local_window_size=25
-        num_affinity_samples=1024,
-        propagation_iters=25,
-        propagation_affinity_thresh=0.7,
-        num_masks=32,
-        num_competition_rounds=3,
-        supervision_level=3,
+        num_affinity_samples=1024
+        propagation_iters=25
+        propagation_affinity_thresh=0.7
+        num_masks=32
+        num_competition_rounds=3
+        supervision_level=3
+        # Feature Decoder
+
         # [Affinity decoder]
         self.feat_conv = nn.Conv2d(output_dim, kq_dim, kernel_size=1, bias=True, padding='same')
         self.key_proj = nn.Linear(kq_dim, kq_dim)
@@ -56,7 +59,7 @@ class EisenNet(nn.Module):
             stride = 2 ** level
             H, W = affinity_res[0]//stride, affinity_res[1]//stride
             buffer_name = f'local_indices_{H}_{W}'
-            self.register_buffer(buffer_name, generate_local_indices(img_size=[H, W], K=local_window_size).cuda(), persistent=False)
+            self.register_buffer(buffer_name, generate_local_indices(img_size=[H, W], K=local_window_size).to(device), persistent=False)
 
         # [Propagation]
         self.propagation = GraphPropagation(num_iters=propagation_iters, adj_thresh=propagation_affinity_thresh)
