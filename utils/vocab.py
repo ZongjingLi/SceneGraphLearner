@@ -1,7 +1,7 @@
 import nltk
 from nltk import WordNetLemmatizer, RegexpTokenizer, pos_tag
 
-nltk.data.path.append('/Users/melkor/Documents/dataset/nltk_data')
+#nltk.data.path.append('/Users/melkor/Documents/dataset/nltk_data')
 for module in ["punkt", "averaged_perceptron_tagger"]:
     try:
         nltk.data.find(f'tokenizers/{module}')
