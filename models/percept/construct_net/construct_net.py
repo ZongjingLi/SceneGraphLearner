@@ -66,6 +66,8 @@ def softmax_max_norm(x):
     x = x.softmax(-1)
     x = x / torch.max(x, dim=-1, keepdim=True)[0].clamp(min=1e-12)# .detach()
     return x
+
+
     
 class ConstructNet(nn.Module):
     def __init__(self, config):
