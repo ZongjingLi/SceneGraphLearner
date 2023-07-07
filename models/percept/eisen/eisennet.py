@@ -130,7 +130,7 @@ class EisenNet(nn.Module):
         self.num_affinity_samples=1024
         propagation_iters= 55
         propagation_affinity_thresh=0.7
-        num_masks= 9 - 1
+        num_masks= 6 - 1
         num_competition_rounds=5
         self.supervision_level = supervision_level
         # [Feature Decoder]
@@ -155,7 +155,7 @@ class EisenNet(nn.Module):
         # [Competition]
         self.competition = Competition(num_masks=num_masks, num_competition_rounds=num_competition_rounds)
 
-        self.verbose = True
+        self.verbose = False
     
     def forward(self, ims):
         if self.verbose: print("ims: BxWxHxC: {}x{}x{}x{}".format(*list(ims.shape)))
@@ -188,10 +188,23 @@ class EisenNet(nn.Module):
             ) * (C ** -0.5)
 
             affinity_list.append(affinity_logits)
-        segments, unharv = self.compute_segments(affinity_list[0], sample_inds)
-        segments = torch.cat([segments, unharv], dim = -1)
+        segments,alive,unharv = self.compute_segments(affinity_list[0], sample_inds)
+
+        masks = torch.cat([segments, unharv], dim = -1)
+
+        masked_features = torch.einsum("bwhn,bwhd->bnd",masks,conv_features)
+        node_features = masked_features / (torch.einsum("bwhn->bn",masks).unsqueeze(-1))
+        scores = torch.cat([alive, unharv.max(1).values.max(1).values.unsqueeze(-1)],dim=-2)
+        scores = torch.min(scores,masks.max(1).values.max(1).values.unsqueeze(-1))
+        
+        # [Base Scene]
+        base_scene = [
+            {"scores":scores,"features":node_features,"masks":masks,"match":False}
+            ]
+        print(scores)
+
         if self.verbose: print("segments: BxWxHxN {}x{}x{}x{}",segments.shape)
-        return segments
+        return {"masks":segments, "abstract_scene":base_scene}
 
     def compute_segments(self, logits, sample_inds, hidden_dim=32, run_cc=True, min_cc_area=20):
         B, N, K = logits.shape
@@ -210,11 +223,8 @@ class EisenNet(nn.Module):
 
         # [Competition]
         masks, agents, alive, phenotypes, unharvested = self.competition(plateau_map)
-        print(alive,alive.shape)
 
-        # [Base Scene]
-
-        return masks, unharvested
+        return masks, alive, unharvested#{"abstract_scene":base_scene}
 
     def compute_affinity_logits(self, key, query, sample_inds):
         B, C, H, W = key.shape

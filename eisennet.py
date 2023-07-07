@@ -19,14 +19,14 @@ esnet = EisenNet(config)
 
 outputs = esnet(ims)
 
-B,W,D,N = outputs.shape
-print(outputs.shape)
+masks = outputs["masks"]
+B,W,D,N = masks.shape
 
 plt.figure("segments")
 for i in range(N):
     for b in range(B):
         plt.subplot(B,N + 1,1 + i + b * (N+1))
-        plt.imshow(outputs[b,:,:,i], cmap = "bone")
+        plt.imshow(masks[b,:,:,i], cmap = "bone")
     plt.subplot(B,N+1,(b+1) * (N+1))
     plt.imshow(ims[b,:,:,:])
 plt.show()
