@@ -201,7 +201,6 @@ class EisenNet(nn.Module):
         base_scene = [
             {"scores":scores,"features":node_features,"masks":masks,"match":False}
             ]
-        print(scores)
 
         if self.verbose: print("segments: BxWxHxN {}x{}x{}x{}",segments.shape)
         return {"masks":segments, "abstract_scene":base_scene}

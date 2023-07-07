@@ -282,17 +282,16 @@ def train_Archerus(train_model, config, args):
                         top_level_scene = abstract_scene[-1]
 
                         working_scene = [top_level_scene]
-
+                        
                         scores   = scores = outputs["abstract_scene"][-1]["scores"]
-                        EPS = 1e-4
+                        EPS = 1e-6
                         scores   = torch.clamp(scores, min = EPS, max = 1 - EPS).reshape([-1])
-
                         #scores = scores.unsqueeze(0)
 
                         features = top_level_scene["features"][b].reshape([scores.shape[0],-1])
 
 
-                        edge = 1e-5
+                        edge = 1e-6
                         if config.concept_type == "box":
                             features = torch.cat([features,edge * torch.ones(features.shape)],-1)#.unsqueeze(0)
 
