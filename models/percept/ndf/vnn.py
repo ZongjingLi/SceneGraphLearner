@@ -151,19 +151,22 @@ class HierarchicalVNN(nn.Module):
         super().__init__()
         latent_dim = config.latent_dim
         perception = config.perception
+        
         if perception == "point_net":
-            self.encoder = None
-        if perception == "":
-            self.encoder = None
+            self.encoder = VNN_ResnetPointnet(c_dim=latent_dim, dim=6) # modified resnet-18
+        if perception == "dgcnn":
+            self.encoder = VNN_DGCNN(c_dim=latent_dim, dim=6) # modified resnet-18
 
         self.decoder = DecoderInner(dim=3, z_dim=latent_dim, c_dim=0, hidden_size=latent_dim,leaky=True, \
                         sigmoid=True, return_features=False, acts="all" )
 
-    def forward(self, inputs):
-        enc_in = input['point_cloud'] * self.scaling 
-        query_points = input['coords'] * self.scaling 
+        self.scaling = config.scaling
 
-        enc_in = torch.cat([enc_in, input['rgb']], 2)
+    def forward(self, inputs):
+        enc_in = inputs['point_cloud'] * self.scaling 
+        query_points = inputs['coords'] * self.scaling 
+
+        enc_in = torch.cat([enc_in, inputs['rgb']], 2)
 
         z = self.encoder(enc_in)
 
@@ -453,7 +456,7 @@ class VNN_ResnetPointnet(nn.Module):
         p = p.unsqueeze(1).transpose(2, 3)
         #mean = get_graph_mean(p, k=self.k)
         #mean = p_trans.mean(dim=-1, keepdim=True).expand(p_trans.size())
-        feat = get_graph_feature_cross(p, k=self.k)
+        feat = get_graph_feature(p, k=self.k)
 
         net = self.conv_pos(feat)
 

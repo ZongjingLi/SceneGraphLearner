@@ -14,6 +14,7 @@ from datasets import *
 from config import *
 from models import *
 from visualize.answer_distribution import *
+from visualize.visualize_pointcloud import *
 
 from torch.utils.tensorboard import SummaryWriter
 import torchvision
@@ -58,29 +59,16 @@ def log_imgs(imsize,pred_img,clusters,gt_img,writer,iter_):
 
 
 
-def train_pointcloud(train_model, config, args):
-
+def train_pointcloud(train_model, config, args, phase = "1"):
+    fig = plt.figure("visualize",figsize=plt.figaspect(1/3), frameon = True)
+    assert phase in ["1", "2", "3", "4", "5"],print("not a valid phase")
     query = True if args.training_mode in ["joint", "query"] else False
     print("\nstart the experiment: {} query:[{}]".format(args.name,query))
     print("experiment config: \nepoch: {} \nbatch: {} samples \nlr: {}\n".format(args.epoch,args.batch_size,args.lr))
     
     #[setup the training and validation dataset]
-    if args.dataset == "ptr":
-        train_dataset = PTRData("train", resolution = config.resolution)
-        val_dataset =  PTRData("val", resolution = config.resolution)
-    if args.dataset == "toy":
-        if query:
-            train_dataset = ToyDataWithQuestions("train", resolution = config.resolution)
-        else:
-            train_dataset = ToyData("train", resolution = config.resolution)
-    if args.dataset == "Acherus":
-        if query:
-            print("Elbon Blade Crusade for You")
-            train_dataset = AcherusDataset("train")
-        else:
-            train_dataset = AcherusImageDataset("train")
-    if args.training_mode == "query":
-        freeze_parameters(train_model.scene_perception.backbone)
+    if args.dataset == "Objects3d":
+        train_dataset= Objects3dDataset(config, sidelength = 128)
 
     dataloader = DataLoader(train_dataset, batch_size = args.batch_size, shuffle = args.shuffle)
 
@@ -110,75 +98,23 @@ def train_pointcloud(train_model, config, args):
     for epoch in range(args.epoch):
         epoch_loss = 0
         for sample in dataloader:
-            
+            sample, gt = sample
             # [perception module training]
-            gt_ims = torch.tensor(sample["image"].numpy()).float().to(config.device)
+            point_cloud = sample["point_cloud"]
+            rgb = sample["rgb"]
+            coords = sample["coords"]
+            occ = sample["occ"]
+            coord_color = sample["coord_color"]
 
-            outputs = model.scene_perception(gt_ims)
+            #outputs = model.scene_perception(sample)
+            all_losses = {}
 
-            # get the components
-            recons, clusters, all_losses = outputs["recons"],outputs["clusters"],outputs["losses"]
-            
-            masks    = outputs["abstract_scene"][-1]["masks"].permute([0,3,1,2]).unsqueeze(-1)
-            scores   = outputs["abstract_scene"][-1]["scores"][0,...] - EPS
-            scores   = torch.clamp(scores, min = EPS, max = 1)
-            #print(scores)
-
+            # [Perception Loss]
             perception_loss = 0
 
-
-            for i,pred_img in enumerate(recons[:]):
-                perception_loss += torch.nn.functional.l1_loss(pred_img.flatten(), gt_ims.flatten())
-
-            # [language query module training]
-            language_loss = 0
-
-            if query:
-                for question in sample["question"]:
-                    for b in range(len(question["program"])):
-                        program = question["program"][b] # string program
-                        answer  = question["answer"][b]  # string answer
-
-                        abstract_scene  = outputs["abstract_scene"]
-                        top_level_scene = abstract_scene[-1]
-
-                        working_scene = [top_level_scene]
-
-                        scores   = top_level_scene["scores"][b,...] - EPS
-                        scores   = torch.clamp(scores, min = EPS, max = 1).reshape([-1])
-
-                        #scores = scores.unsqueeze(0)
-
-                        features = top_level_scene["features"][b].reshape([scores.shape[0],-1])
-
-
-                        edge = 1e-6
-                        if config.concept_type == "box":
-                            features = torch.cat([features,edge * torch.ones(features.shape)],-1)#.unsqueeze(0)
-
-                        kwargs = {"features":features,
-                                  "end":scores }
-
-                        q = train_model.executor.parse(program)
-                        
-                        o = train_model.executor(q, **kwargs)
-                        #print("Batch:{}".format(b),q,o["end"],answer)
-                        
-                        if answer in numbers:
-                            int_num = torch.tensor(numbers.index(answer)).float().to(args.device)
-                            language_loss += F.mse_loss(int_num + 1,o["end"])
-                            if itrs % args.checkpoint_itrs == 0:
-                                print(q,answer)
-                                visualize_scores(scores.reshape([args.batch_size,-1,1]).detach())
-                                answer_distribution_num(o["end"].cpu().detach().numpy(),1+int_num.cpu().detach().numpy())
-                        if answer in yes_or_no:
-                            if answer == "yes":language_loss -= torch.log(torch.sigmoid(o["end"]))
-                            else:language_loss -= torch.log(1 - torch.sigmoid(o["end"]))
-                            if itrs % args.checkpoint_itrs == 0:
-                                print(q,answer)
-                                print(torch.sigmoid(o["end"]).cpu().detach().numpy())
-                                visualize_scores(scores.reshape([args.batch_size,-1,1]).detach())
-                                answer_distribution_binary(torch.sigmoid(o["end"]).cpu().detach().numpy())
+            # [Language Loss]
+            language_loss = torch.zeros(1)
+  
             # [calculate the working loss]
             working_loss = perception_loss * alpha + language_loss * beta
             epoch_loss += working_loss.detach().numpy()
@@ -189,8 +125,8 @@ def train_pointcloud(train_model, config, args):
                     writer.add_scalar(str(i)+loss_name, loss, itrs)
 
             optimizer.zero_grad()
-            working_loss.backward()
-            optimizer.step()
+            #working_loss.backward()
+            #optimizer.step()
 
             writer.add_scalar("working_loss", working_loss, itrs)
             writer.add_scalar("perception_loss", perception_loss, itrs)
@@ -199,17 +135,11 @@ def train_pointcloud(train_model, config, args):
             if not(itrs % args.checkpoint_itrs):
                 name = args.name
                 expr = args.training_mode
-                num_slots = masks.shape[1]
-                torch.save(train_model, "checkpoints/{}_{}_{}_{}.ckpt".format(name,expr,config.domain,config.perception))
-                log_imgs(config.imsize,pred_img.cpu().detach(), clusters, gt_ims.reshape([args.batch_size,config.imsize ** 2,3]).cpu().detach(),writer,itrs)
-                
-                visualize_image_grid(gt_ims.flatten(start_dim = 0, end_dim = 1).cpu().detach(), row = args.batch_size, save_name = "ptr_gt_perception")
-                visualize_image_grid(gt_ims[0].cpu().detach(), row = 1, save_name = "val_gt_image")
-
-                
-                single_comps =  torchvision.utils.make_grid((masks*gt_ims)[0:1].cpu().detach().permute([0,1,4,2,3]).flatten(start_dim = 0, end_dim = 1),normalize=True,nrow=num_slots).permute(1,2,0)
-                visualize_image_grid(single_comps.cpu().detach(), row = 1, save_name = "slot_masks")
-                #visualize_psg(gt_ims[0:1].cpu().detach(), outputs["abstract_scene"], args.effective_level)
+                torch.save(train_model.state_dict(), "checkpoints/{}_{}_{}_{}.pth".format(name,expr,config.domain,config.perception))
+                input_pcs = [(coords[0,:,:] * (occ[0,:,:]+1)/ 2,coord_color[0,:,:]),
+                    (point_cloud[0,:,:],rgb[0,:,:]),
+                    (coords[0,:,:] * (occ[0,:,:]+1)/ 2,coord_color[0,:,:])]
+                visualize_pointcloud(fig,input_pcs, "pointcloud")
 
             itrs += 1
 
@@ -287,7 +217,7 @@ print("using perception: {} knowledge:{} dataset:{}".format(args.perception,conf
 
 if args.dataset in ["Objects3d"]:
     print("start the 3d point cloud model training.")
-    train_pointcloud(model, config. args)
+    train_pointcloud(model, config, args, phase = args.phase)
 
 if args.dataset in ["Sprites","Acherus","Toys","PTR"]:
     print("start the image domain training session.")

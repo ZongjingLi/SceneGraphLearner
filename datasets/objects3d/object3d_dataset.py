@@ -11,7 +11,7 @@ import os
 
 
 class Objects3dDataset(Dataset):
-    def __init__(self, config, sidelength, depth_aug=False, multiview_aug=False, phase='train', stage=0, vis=False, test=False):
+    def __init__(self, config, sidelength, depth_aug=True, multiview_aug=True, phase='train', stage=0, vis=False, test=False):
         root = config.dataset_root
         self.root = root
         self.stage = stage
@@ -203,12 +203,13 @@ class Objects3dDataset(Dataset):
         for i, dp_np in enumerate(dp_nps):
             point_transform = torch.matmul(transform, torch.inverse(transforms[i]))
 
-            rgb_world.append(dp_np[..., 4:]/255)
+            rgb_world.append(dp_np[..., -1:]/255)
 
             dp_np = torch.sum(point_transform[None, :, :] * dp_np[:, None, :4], dim=-1)
             points_world.append(dp_np[..., :3])            
+        print(i)
+        rgb_world = torch.cat(rgb_world, dim=-1)
 
-        rgb_world = torch.cat(rgb_world, dim=0)
         point_cloud = torch.cat(points_world, dim=0)
 
         rix = torch.randperm(point_cloud.size(0))

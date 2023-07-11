@@ -28,7 +28,7 @@ def get_graph_feature(x, k=20, idx=None, x_coord=None):
             idx = knn(x_coord, k=k)   # (batch_size, num_points, k)
         else:             # fixed knn graph with input point coordinates
             idx = knn(x, k=k)
-    device = torch.device('cuda')
+    device = torch.device('cuda') if torch.cuda.is_available() else "cpu"
 
     idx_base = torch.arange(0, batch_size, device=device).view(-1, 1, 1)*num_points
 
@@ -41,36 +41,38 @@ def get_graph_feature(x, k=20, idx=None, x_coord=None):
 
     x = x.transpose(2, 1).contiguous()   # (batch_size, num_points, num_dims)  -> (batch_size*num_points, num_dims) #   batch_size * num_points * k + range(0, batch_size*num_points)
     feature = x.view(batch_size*num_points, -1)[idx, :]
+    print(x.view(batch_size*num_points, -1).shape)
+    print(feature.shape)
     feature = feature.view(batch_size, num_points, k, num_dims, 3) 
     x = x.view(batch_size, num_points, 1, num_dims, 3).repeat(1, 1, k, 1, 1)
-    
+
     feature = torch.cat((feature-x, x), dim=3).permute(0, 3, 4, 1, 2).contiguous()
-  
+
     return feature
 
 
 def get_graph_feature_cross(x, k=20, idx=None):
+    print(x.shape)
     batch_size = x.size(0)
-    num_points = x.size(3)
-    x = x.view(batch_size, -1, num_points)
+    num_points = x.size(-1)
+    x = x.reshape(batch_size, -1, num_points)
     if idx is None:
         idx = knn(x, k=k)   # (batch_size, num_points, k)
-    device = torch.device('cuda')
+    device = torch.device('cuda') if torch.cuda.is_available() else "cpu"
 
     idx_base = torch.arange(0, batch_size, device=device).view(-1, 1, 1)*num_points
 
     idx = idx + idx_base
-
     idx = idx.view(-1)
- 
+
     _, num_dims, _ = x.size()
     num_dims = num_dims // 3
 
     x = x.transpose(2, 1).contiguous()   # (batch_size, num_points, num_dims)  -> (batch_size*num_points, num_dims) #   batch_size * num_points * k + range(0, batch_size*num_points)
     feature = x.view(batch_size*num_points, -1)[idx, :]
-
     feature = feature.view(batch_size, num_points, k, num_dims, 3) 
     x = x.view(batch_size, num_points, 1, num_dims, 3).repeat(1, 1, k, 1, 1)
+
     cross = torch.cross(feature, x, dim=-1)
     
     feature = torch.cat((feature-x, x, cross), dim=3).permute(0, 3, 4, 1, 2).contiguous()
