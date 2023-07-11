@@ -18,6 +18,10 @@ from torch.utils.tensorboard import SummaryWriter
 import torchvision
 from skimage import color
 
+def get_not_image(B, W = 128, H = 128, C = 3):
+    not_image = torch.zeros([B,W,H,C])
+    not_image[:,30:50,50:70,:] = 1
+    return not_image
 
 def freeze_parameters(model):
     for param in model.parameters():
@@ -36,21 +40,22 @@ def log_imgs(imsize,pred_img,clusters,gt_img,writer,iter_):
                           normalize=True,nrow=batch_size)
 
     # Write grid of image clusters through layers
-    cluster_imgs = []
-    for i,(cluster,_) in enumerate(clusters):
-        for cluster_j,_ in reversed(clusters[:i+1]): cluster = cluster[cluster_j]
-        pix_2_cluster = to_dense_batch(cluster,clusters[0][1])[0]
-        cluster_2_rgb = torch.tensor(color.label2rgb(
+    if clusters is not None:
+        cluster_imgs = []
+        for i,(cluster,_) in enumerate(clusters):
+            for cluster_j,_ in reversed(clusters[:i+1]): cluster = cluster[cluster_j]
+            pix_2_cluster = to_dense_batch(cluster,clusters[0][1])[0]
+            cluster_2_rgb = torch.tensor(color.label2rgb(
                     pix_2_cluster.detach().cpu().numpy().reshape(-1,imsize,imsize) 
                                     ))
-        cluster_imgs.append(cluster_2_rgb)
-    cluster_imgs = torch.cat(cluster_imgs)
-    grid2=torchvision.utils.make_grid(cluster_imgs.permute(0,3,1,2),nrow=batch_size)
-    writer.add_image("Clusters",grid2.detach().numpy(),iter_)
+            cluster_imgs.append(cluster_2_rgb)
+        cluster_imgs = torch.cat(cluster_imgs)
+        grid2=torchvision.utils.make_grid(cluster_imgs.permute(0,3,1,2),nrow=batch_size)
+        writer.add_image("Clusters",grid2.detach().numpy(),iter_)
+        visualize_image_grid(cluster_imgs[batch_size,...], row = 1, save_name = "val_cluster")
     writer.add_image("Output_vs_GT",grid.detach().numpy(),iter_)
     writer.add_image("Output_vs_GT Var",grid.detach().numpy(),iter_)
 
-    visualize_image_grid(cluster_imgs[batch_size,...], row = 1, save_name = "val_cluster")
     visualize_image_grid(pred_img.reshape(batch_size,imsize,imsize,3)[0,...], row = 1, save_name = "val_recon")
 
 
@@ -83,7 +88,7 @@ def train_image(train_model, config, args):
     if args.training_mode == "query":
         freeze_parameters(train_model.scene_perception.backbone)
 
-    dataloader = DataLoader(train_dataset, batch_size = args.batch_size, shuffle = args.shuffle)
+    dataloader = DataLoader(train_dataset, batch_size = args.batch_size, shuffle = args.shuffle); B = args.batch_size
 
     # [joint training of perception and language]
     alpha = args.alpha
@@ -139,6 +144,7 @@ def train_image(train_model, config, args):
             if recons is not None: 
                 for i,pred_img in enumerate(recons[:]):
                     perception_loss += torch.nn.functional.l1_loss(pred_img.flatten(), gt_ims.flatten()) * betas[i]
+            pred_img = recons
 
             if "full_recons" in outputs: perception_loss += torch.nn.functional.l1_loss(outputs["full_recons"].flatten(), gt_ims.flatten())
             
@@ -217,14 +223,16 @@ def train_image(train_model, config, args):
             if not(itrs % args.checkpoint_itrs):
                 num_concepts = 8
 
-                #concept_visualizer.visualize(results,train_model, concept_split_specs,itrs / args.checkpoint_itrs)
                 name = args.name
                 expr = args.training_mode
                 num_slots = masks.shape[1]
                 torch.save(train_model.state_dict(), "checkpoints/{}_{}_{}_{}.pth".format(name,expr,config.domain,config.perception))
-                
-                if clusters is not None:
-                    log_imgs(config.imsize,pred_img.cpu().detach(), clusters, gt_ims.reshape([args.batch_size,config.imsize ** 2,3]).cpu().detach(),writer,itrs)
+
+                if pred_img is None: pred_img = get_not_image(B)
+                pred_img = pred_img.reshape(B,128**2,3)
+
+
+                log_imgs(config.imsize,pred_img.cpu().detach(), clusters, gt_ims.reshape([args.batch_size,config.imsize ** 2,3]).cpu().detach(),writer,itrs)
                 
                 visualize_image_grid(gt_ims.flatten(start_dim = 0, end_dim = 1).cpu().detach(), row = args.batch_size, save_name = "ptr_gt_perception")
                 visualize_image_grid(gt_ims[0].cpu().detach(), row = 1, save_name = "val_gt_image")

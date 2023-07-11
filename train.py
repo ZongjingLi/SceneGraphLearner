@@ -283,14 +283,14 @@ def build_perception(size,length,device):
                             edges[1].append( (i+dx) * size + (j + dy))
     return torch.tensor(edges).to(device)
 
-
+print("using perception: {} knowledge:{} dataset:{}".format(args.perception,config.concept_type,args.dataset))
 
 if args.dataset in ["Objects3d"]:
     print("start the 3d point cloud model training.")
     train_pointcloud(model, config. args)
 
 if args.dataset in ["Sprites","Acherus","Toys","PTR"]:
-    print("Val'kyr start the training session.")
+    print("start the image domain training session.")
     train_image(model, config, args)
 
 
