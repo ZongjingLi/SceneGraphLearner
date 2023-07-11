@@ -94,7 +94,7 @@ def optical_flow_motion_mask(video):
     return masks
 
 class PSGNet(torch.nn.Module):
-    def __init__(self,imsize, perception_size, node_feat_size, struct = [1, 1]):
+    def __init__(self,imsize, perception_size, node_feat_size, struct = [1,1]):
 
         super().__init__()
         device = "cuda:0" if torch.cuda.is_available() else "cpu"
@@ -323,7 +323,7 @@ class SceneGraphLevel(nn.Module):
         in_scores = inputs["scores"]
         B, N, C = in_scores.shape[0],in_scores.shape[1],in_features.shape[-1]
 
-        """
+   
 
         raw_spatials = in_features[-2:]
 
@@ -356,19 +356,19 @@ class SceneGraphLevel(nn.Module):
 
         in_masks = inputs["masks"]
         out_masks = torch.einsum("bwhm,bmn->bwhn",in_masks,match)
-        """
-        in_features = in_features
+
+        #in_features = in_features
         #print(in_features.shape)
-        masks, agents, alive, pheno, unharv = self.node_extractor(in_features.unsqueeze(1))
-        match= torch.cat([masks, unharv], dim = -1).squeeze(1)
+        #masks, agents, alive, pheno, unharv = self.node_extractor(in_features.unsqueeze(1))
+        #match= torch.cat([masks, unharv], dim = -1).squeeze(1)
 
-        in_masks = inputs["masks"]
-        out_masks = torch.einsum("bwhm,bmn->bwhn",in_masks,match)
+        #in_masks = inputs["masks"]
+        #out_masks = torch.einsum("bwhm,bmn->bwhn",in_masks,match)
 
-        out_scores = torch.max(match, dim = 1).values
-        out_features = torch.einsum("bnc,bnm->bmc",in_features, match)
+        #out_scores = torch.max(match, dim = 1).values
+        #out_features = torch.einsum("bnc,bnm->bmc",in_features, match)
 
-        return {"features":out_features,"scores":out_scores, "masks":out_masks, "match":masks}
+        return {"features":out_features,"scores":out_scores, "masks":out_masks, "match":match}
 
 
 class SceneGraphNet(nn.Module):
@@ -376,7 +376,7 @@ class SceneGraphNet(nn.Module):
         super().__init__()
         self.backbone = PSGNet(config.imsize, config.perception_size, config.object_dim - 2)
         self.scene_graph_levels = nn.ModuleList([
-            SceneGraphLevel(10, config),
+            SceneGraphLevel(16, config),
             #SceneGraphLevel(4, config)
         ])
 

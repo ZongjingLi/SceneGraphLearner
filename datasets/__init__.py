@@ -6,3 +6,4 @@ from .ptr import *
 from .acherus import *
 from .physica import *
 from .industry import *
+from .objects3d import *

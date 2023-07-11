@@ -328,8 +328,9 @@ class SlotAttentionParser(nn.Module):
         else:
             recons = torch.sum( img * masks,1)
         loss = torch.mean((recons-image) ** 2) # the mse loss of the reconstruction
-        
-        outputs = {"full_recons":recons.permute([0,2,3,1]),
+        scene =  [{"scores":object_scores,"features":object_features,"masks":masks.permute([0,1,3,4,2]),"match":False,"recons":img.permute([0,1,3,4,2])}]
+        outputs = {"abstract_scene":scene,
+                "full_recons":recons.permute([0,2,3,1]),
                 "masks":masks.permute([0,1,3,4,2]),
                 "recons":img.permute([0,1,3,4,2]),
                 "loss":loss,

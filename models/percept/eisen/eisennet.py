@@ -112,6 +112,10 @@ def generate_local_indices(img_size, K, padding='constant'):
     local_inds = local_inds.permute(0, 2, 1)
     return local_inds
 
+class Id(nn.Module):
+    def __init__(self):super().__init__()
+    def forward(self, x):return x
+
 class EisenNet(nn.Module):
     def __init__(self, config):
         super().__init__()
@@ -119,7 +123,7 @@ class EisenNet(nn.Module):
         self.device = device
         affinity_res=[128, 128]
         self.affinity_res = affinity_res
-        kq_dim = 32
+        kq_dim = 64
         supervision_level = 1
         conv_feat_dim = 64
         output_dim = conv_feat_dim
@@ -138,8 +142,8 @@ class EisenNet(nn.Module):
                                RDNconfig=(4,3,16),scale=[2],no_upsampling=True))
         # [Affinity decoder]
         self.feat_conv = nn.Conv2d(output_dim, kq_dim, kernel_size=1, bias=True, padding='same')
-        self.key_proj = nn.Linear(kq_dim, kq_dim)
-        self.query_proj = nn.Linear(kq_dim, kq_dim)
+        self.key_proj = Id()#nn.Linear(kq_dim, kq_dim)
+        self.query_proj = Id()#nn.Linear(kq_dim, kq_dim)
 
         # [Affinity sampling]
         self.sample_affinity = subsample_affinity and (not (eval_full_affinity and (not self.training)))
@@ -159,11 +163,12 @@ class EisenNet(nn.Module):
     
     def forward(self, ims):
         if self.verbose: print("ims: BxWxHxC: {}x{}x{}x{}".format(*list(ims.shape)))
-        conv_features = self.grid_conv(ims.permute(0,3,1,2)).permute(0,2,3,1) * 10
+        conv_features = self.grid_conv(ims.permute(0,3,1,2)).permute(0,2,3,1) * 1
         
         if self.verbose: print("conv_features: BxWxHxD: {}x{}x{}x{}".format(*list(conv_features.shape)))
 
         kq_features = self.feat_conv(conv_features.permute(0,3,1,2)).permute(0,2,3,1)
+        kq_features = F.normalize(kq_features, p = 2.0, dim = -1)
         key = self.key_proj(kq_features).permute(0, 3, 1, 2) # [B, C, H, W]
         query = self.query_proj(kq_features).permute(0, 3, 1, 2) # [B, C, H, W]
         B, C, H, W = key.shape
@@ -192,18 +197,33 @@ class EisenNet(nn.Module):
 
         masks = torch.cat([segments, unharv], dim = -1)
 
+        # raw features from the masked level
         masked_features = torch.einsum("bwhn,bwhd->bnd",masks,conv_features)
-        node_features = masked_features / (torch.einsum("bwhn->bn",masks).unsqueeze(-1))
+        node_features = masked_features / (torch.einsum("bwhn->bn",masks).unsqueeze(-1)) # [B,N,D]
+
+        # raw scores of alive agents mask
         scores = torch.cat([alive, unharv.max(1).values.max(1).values.unsqueeze(-1)],dim=-2)
         scores = torch.min(scores,masks.max(1).values.max(1).values.unsqueeze(-1))
-        
+
+        # masked feature scores
+        node_features = F.normalize(node_features, p = 2.0, dim =-1)
+        mask_features = F.normalize(torch.einsum("bwhn,bwhd->bnwhd",masks,conv_features), p = 2.0, dim = -1)
+        mask_logits = torch.einsum("bnwhd,bnd->bnwh",mask_features,node_features)
+        #print(mask_logits)
+        mask_probs = mask_logits#torch.sigmoid((mask_logits - 0.5) / 1.0)
+
+        mask_scores = mask_probs.max(-1).values.max(-1).values.unsqueeze(-1)
+
+        scores = torch.min(scores,mask_scores)
+
         # [Base Scene]
+
         base_scene = [
-            {"scores":scores,"features":node_features,"masks":masks,"match":False}
+            {"scores":scores,"features":node_features,"masks":mask_logits.permute(0,2,3,1),"match":False}
             ]
 
         if self.verbose: print("segments: BxWxHxN {}x{}x{}x{}",segments.shape)
-        return {"masks":segments, "abstract_scene":base_scene}
+        return {"masks":segments, "abstract_scene":base_scene,"losses":0}
 
     def compute_segments(self, logits, sample_inds, hidden_dim=32, run_cc=True, min_cc_area=20):
         B, N, K = logits.shape

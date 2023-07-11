@@ -4,6 +4,7 @@ import torch.nn as nn
 from models.nn import *
 from models.nn.box_registry import build_box_registry
 from models.percept import *
+from models.percept.ndf.vnn import HierarchicalVNN
 from .executor import *
 from utils import *
 
@@ -19,12 +20,16 @@ class SceneLearner(nn.Module):
         if config.perception == "psgnet":
             self.scene_perception = SceneGraphNet(config)
         if config.perception == "local_psgnet":
-            self.scene_perception = ControlSceneGraphNet(config)#LocalSceneGraphNet(config)
+            self.scene_perception = ControlSceneGraphNet(config)
         if config.perception == "valkyr":
-            self.scene_perception = EisenNet(config) #ConstructNet(config)
+            self.scene_perception = ContrastNet(config) #EisenNet(config) #ConstructNet(config)
         if config.perception == "slot_attention":
             self.scene_perception = SlotAttentionParser(config.object_num, config.object_dim,5)
             self.part_perception = SlotAttention(config.part_num, config.object_dim,5)
+
+        # PointNet Perception Module
+        if config.perception == "point_net":
+            self.scene_perception = HierarchicalVNN(config)
 
         # [Concept Structure Embedding]
         self.box_registry = build_box_registry(config)

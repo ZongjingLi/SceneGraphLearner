@@ -2,12 +2,12 @@ import numpy as np
 import torch
 
 from torch.nn import functional as F
-import util
+from utils import *
 
 
 def compute_normal_map(x_img, y_img, z, intrinsics):
     cam_coords = lift(x_img, y_img, z, intrinsics)
-    cam_coords = util.lin2img(cam_coords)
+    cam_coords = lin2img(cam_coords)
 
     shift_left = cam_coords[:, :, 2:, :]
     shift_right = cam_coords[:, :, :-2, :]

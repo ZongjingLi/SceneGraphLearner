@@ -1,6 +1,8 @@
 import warnings
 warnings.filterwarnings("ignore")
 
+import tensorflow
+
 import torch
 import argparse 
 import datetime
@@ -56,7 +58,7 @@ def log_imgs(imsize,pred_img,clusters,gt_img,writer,iter_):
 
 
 
-def train_Valkyr(train_model, config, args):
+def train_pointcloud(train_model, config, args):
 
     query = True if args.training_mode in ["joint", "query"] else False
     print("\nstart the experiment: {} query:[{}]".format(args.name,query))
@@ -218,6 +220,7 @@ def train_Valkyr(train_model, config, args):
 
 argparser = argparse.ArgumentParser()
 # [general config of the training]
+argparser.add_argument("--phase",                   default = "1")
 argparser.add_argument("--device",                  default = config.device)
 argparser.add_argument("--name",                    default = "KFT")
 argparser.add_argument("--epoch",                   default = 400)
@@ -234,7 +237,7 @@ argparser.add_argument("--beta",                    default = 0.001)
 
 # [additional training details]
 argparser.add_argument("--warmup",                  default = True)
-argparser.add_argument("--warmup_steps",            default = 10)
+argparser.add_argument("--warmup_steps",            default = 300)
 argparser.add_argument("--decay",                   default = False)
 argparser.add_argument("--decay_steps",             default = 20000)
 argparser.add_argument("--decay_rate",              default = 0.99)
@@ -245,36 +248,21 @@ argparser.add_argument("--effective_level",         default = 1)
 
 # [checkpoint location and savings]
 argparser.add_argument("--checkpoint_dir",          default = False)
-argparser.add_argument("--checkpoint_itrs",         default = 5)
+argparser.add_argument("--checkpoint_itrs",         default = 10)
 argparser.add_argument("--pretrain_perception",     default = False)
 
 args = argparser.parse_args()
 
 config.perception = args.perception
-print(config.perception)
 
 if args.checkpoint_dir:
     model = torch.load(args.checkpoint_dir, map_location = config.device)
 else:
     print("No checkpoint to load and creating a new model instance")
-    if args.name == "Acherus":
-        config.perception = "psgnet"
-        model = SceneLearner(config)
-    if args.name == "Elbon" or "PTR":
-        config.domain = "toy"
-        print("Elbon Blade Training Set")
-        args.dataset = "Elbon"
-        model = SceneLearner(config)
-    if args.name == "Sprites":
-        config.domain = "sprites"
-        args.dataset = "sprites"
-        print("Init the Sprites Scene Graph Net")
-        model = SceneLearner(config)
+    model = SceneLearner(config)
+
 if args.pretrain_perception:
     model.scene_perception = torch.load(args.pretrain_perception, map_location = config.device)
-
-#model = torch.load("checkpoints/TBC_joint_toy_slot_attention.ckpt", map_location=args.device)
-#model.scene_perception.slot_attention.iters = 10
 
 def build_perception(size,length,device):
     edges = [[],[]]
@@ -296,19 +284,13 @@ def build_perception(size,length,device):
     return torch.tensor(edges).to(device)
 
 
-if args.name == "Sprites":
+
+if args.dataset in ["Objects3d"]:
+    print("start the 3d point cloud model training.")
+    train_pointcloud(model, config. args)
+
+if args.dataset in ["Sprites","Acherus","Toys","PTR"]:
     print("Val'kyr start the training session.")
-    train_Archerus(model, config, args)
+    train_image(model, config, args)
 
-elif args.name == "Acherus":
-    print("Assault on New Avalon")
-    config.perception = args.perception
-    train_Archerus(model, config, args)
-
-elif args.name == "Elbon" or "PTR":
-    print("The Elbon Blade")
-    args.dataset = "toy"
-    if args.name == "PTR":args.dataset = "ptr"
-    config.perception = args.perception
-    train_Archerus(model, config, args)
 

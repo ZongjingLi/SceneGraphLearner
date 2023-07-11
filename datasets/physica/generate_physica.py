@@ -49,7 +49,8 @@ class MyGame(arcade.Window):
     def __init__(self, width, height, title):
         super().__init__(width, height, title)
 
-        arcade.set_background_color((61,77,86))
+        #arcade.set_background_color((61,77,86))
+        arcade.set_background_color((1,47,65))
         self.paused = False
         self.hold = 0
 
@@ -75,10 +76,11 @@ class MyGame(arcade.Window):
         self.processing_time = 0
 
         # Create the floor
-        floor_height = 80
+        floor_height = 5
         body = pymunk.Body(body_type=pymunk.Body.STATIC)
-        shape = pymunk.Segment(body, [0, floor_height], [SCREEN_WIDTH, floor_height], 0.0)
+        shape = pymunk.Segment(body, [0, floor_height], [SCREEN_WIDTH, floor_height], 1.0)
         shape.friction = 20
+
         self.space.add(shape, body)
         self.static_lines.append(shape)
 
@@ -100,17 +102,12 @@ class MyGame(arcade.Window):
                  500 + column* size,
                   size * row + (floor_height + size / 2), friction = 100, mass =500)
         """
-
         for row in range(8):
             for column in range(4):
                 make_body(self, "crafting_table_gondolin_bottom.png",
                  700 + column* size,
                   size * row + (floor_height + size / 2), friction = 500, mass =1000)
 
-        #make_body(self, "tol_in_gaurhoth_torch.png", 900, (floor_height + size / 2), mass = 100)
-        #make_body(self, "tolingaurhoth_gate_base.png", 900, (floor_height + size / 2 * 5), mass = 5000, box_shape=(32 * 4,32 * 1))
-        #make_body(self, "tolingaurhoth_gate_base.png", 900, (floor_height + size / 2 * 7), mass = 5000, box_shape=(32 * 4,32 * 1))
-        
         if False:
             mass = 1500
             radius = 20
