@@ -204,9 +204,10 @@ if args.checkpoint_dir:
 else:
     print("No checkpoint to load and creating a new model instance")
     model = SceneLearner(config)
+    model.load_state_dict(torch.load(args.checkpoint_dir))
 
 if args.pretrain_perception:
-    model.scene_perception = torch.load(args.pretrain_perception, map_location = config.device)
+    model.scene_perception.load_state_dict(torch.load(args.pretrain_perception, map_location = config.device))
 
 def build_perception(size,length,device):
     edges = [[],[]]
