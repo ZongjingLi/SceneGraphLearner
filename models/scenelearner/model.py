@@ -4,7 +4,6 @@ import torch.nn as nn
 from models.nn import *
 from models.nn.box_registry import build_box_registry
 from models.percept import *
-from models.percept.ndf.vnn import HierarchicalVNN
 from .executor import *
 from utils import *
 
@@ -27,7 +26,7 @@ class SceneLearner(nn.Module):
             self.part_perception = SlotAttention(config.part_num, config.object_dim,5)
 
         # PointNet Perception Module
-        if config.perception == "point_net":
+        if config.perception in ["point_net","dgcnn"]:
             self.scene_perception = HierarchicalVNN(config)
 
         # [Concept Structure Embedding]

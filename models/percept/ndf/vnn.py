@@ -157,8 +157,9 @@ class HierarchicalVNN(nn.Module):
         if perception == "dgcnn":
             self.encoder = VNN_DGCNN(c_dim=latent_dim, dim=6) # modified resnet-18
 
+        self.return_features = True
         self.decoder = DecoderInner(dim=3, z_dim=latent_dim, c_dim=0, hidden_size=latent_dim,leaky=True, \
-                        sigmoid=True, return_features=False, acts="all" )
+                        sigmoid=True, return_features=self.return_features, acts="all" )
 
         self.scaling = config.scaling
 
@@ -171,10 +172,14 @@ class HierarchicalVNN(nn.Module):
         z = self.encoder(enc_in)
 
         outputs = {}
+        
         if self.return_features:
-            outputs['occ_branch'], outputs['features'], outputs['features2'], outputs['color'], outputs['occ'] = self.decoder(input['coords'], input['occ'], query_points, z)
+            outputs['occ_branch'], outputs['features'], outputs['features2'], outputs['color'], outputs['occ'] = self.decoder(inputs['coords'], inputs['occ'], query_points, z)
         else:
-            outputs['occ_branch'], outputs['color'], outputs['occ'] = self.decoder(input['coords'], input['occ'], query_points, z)
+            outputs['occ_branch'], outputs['color'], outputs['occ'] = self.decoder(inputs['coords'], inputs['occ'], query_points, z)
+        recon_loss_occ = torch.nn.functional.mse_loss(outputs["occ"],inputs["occ"])
+        recon_loss_color = torch.nn.functional.mse_loss(outputs["color"],inputs["coord_color"])
+        outputs["loss"] = recon_loss_occ + recon_loss_color
         return outputs
 
 class VNNOccNet(nn.Module):
@@ -431,7 +436,7 @@ class VNN_ResnetPointnet(nn.Module):
         self.k = k
         self.meta_output = meta_output
 
-        self.conv_pos = VNLinearLeakyReLU(6, 128, negative_slope=0.2, share_nonlinearity=False, use_batchnorm=False)
+        self.conv_pos = VNLinearLeakyReLU(3, 128, negative_slope=0.2, share_nonlinearity=False, use_batchnorm=False)
         self.fc_pos = VNLinear(128, 2*hidden_dim)
         self.block_0 = VNResnetBlockFC(2*hidden_dim, hidden_dim)
         self.block_1 = VNResnetBlockFC(2*hidden_dim, hidden_dim)
@@ -456,7 +461,7 @@ class VNN_ResnetPointnet(nn.Module):
         p = p.unsqueeze(1).transpose(2, 3)
         #mean = get_graph_mean(p, k=self.k)
         #mean = p_trans.mean(dim=-1, keepdim=True).expand(p_trans.size())
-        feat = get_graph_feature(p, k=self.k)
+        feat = get_graph_feature_cross(p, k=self.k)
 
         net = self.conv_pos(feat)
 

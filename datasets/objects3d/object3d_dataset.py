@@ -207,7 +207,6 @@ class Objects3dDataset(Dataset):
 
             dp_np = torch.sum(point_transform[None, :, :] * dp_np[:, None, :4], dim=-1)
             points_world.append(dp_np[..., :3])            
-        print(i)
         rgb_world = torch.cat(rgb_world, dim=-1)
 
         point_cloud = torch.cat(points_world, dim=0)

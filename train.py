@@ -60,7 +60,6 @@ def log_imgs(imsize,pred_img,clusters,gt_img,writer,iter_):
 
 
 def train_pointcloud(train_model, config, args, phase = "1"):
-    fig = plt.figure("visualize",figsize=plt.figaspect(1/3), frameon = True)
     assert phase in ["1", "2", "3", "4", "5"],print("not a valid phase")
     query = True if args.training_mode in ["joint", "query"] else False
     print("\nstart the experiment: {} query:[{}]".format(args.name,query))
@@ -106,14 +105,18 @@ def train_pointcloud(train_model, config, args, phase = "1"):
             occ = sample["occ"]
             coord_color = sample["coord_color"]
 
-            #outputs = model.scene_perception(sample)
+            outputs = model.scene_perception(sample)
             all_losses = {}
 
             # [Perception Loss]
             perception_loss = 0
+            perception_loss += outputs["loss"]
+
+            recon_occ = outputs["occ"]
+            recon_coord_color = outputs["color"]
 
             # [Language Loss]
-            language_loss = torch.zeros(1)
+            language_loss = 0
   
             # [calculate the working loss]
             working_loss = perception_loss * alpha + language_loss * beta
@@ -125,8 +128,8 @@ def train_pointcloud(train_model, config, args, phase = "1"):
                     writer.add_scalar(str(i)+loss_name, loss, itrs)
 
             optimizer.zero_grad()
-            #working_loss.backward()
-            #optimizer.step()
+            working_loss.backward()
+            optimizer.step()
 
             writer.add_scalar("working_loss", working_loss, itrs)
             writer.add_scalar("perception_loss", perception_loss, itrs)
@@ -136,10 +139,21 @@ def train_pointcloud(train_model, config, args, phase = "1"):
                 name = args.name
                 expr = args.training_mode
                 torch.save(train_model.state_dict(), "checkpoints/{}_{}_{}_{}.pth".format(name,expr,config.domain,config.perception))
+                """
                 input_pcs = [(coords[0,:,:] * (occ[0,:,:]+1)/ 2,coord_color[0,:,:]),
                     (point_cloud[0,:,:],rgb[0,:,:]),
                     (coords[0,:,:] * (occ[0,:,:]+1)/ 2,coord_color[0,:,:])]
                 visualize_pointcloud(fig,input_pcs, "pointcloud")
+                """            
+                np.save("outputs/point_cloud.npy",np.array(point_cloud[0,:,:]))
+                np.save("outputs/rgb.npy",np.array(rgb[0,:,:]))
+                np.save("outputs/coords.npy",np.array(coords[0,:,:]))
+                np.save("outputs/occ.npy",np.array(occ[0,:,:]))
+                np.save("outputs/coord_color.npy",np.array(coord_color[0,:,:]))
+
+                np.save("outputs/recon_occ.npy",np.array(recon_occ[0,:].unsqueeze(-1).detach()))
+                np.save("outputs/recon_coord_color.npy",np.array(recon_coord_color[0,:,:].detach()))
+
 
             itrs += 1
 

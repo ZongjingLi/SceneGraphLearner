@@ -3,9 +3,9 @@ import matplotlib.pyplot as plt
 from matplotlib import cm
 from mpl_toolkits.mplot3d import Axes3D
 
-def visualize_pointcloud(fig, input_pcs,name="pc"):
+def visualize_pointcloud(input_pcs,name="pc"):
     rang = 0.4; N = len(input_pcs)
-
+    fig = plt.figure("visualize",figsize=plt.figaspect(1/N), frameon = True)
     for i in range(N):
         ax = fig.add_subplot(1, N, 1 + i, projection='3d')
         ax.set_zlim(-rang,rang);ax.set_xlim(-rang,rang);ax.set_ylim(-rang,rang)
