@@ -200,11 +200,13 @@ args = argparser.parse_args()
 config.perception = args.perception
 
 if args.checkpoint_dir:
-    model = torch.load(args.checkpoint_dir, map_location = config.device)
-else:
-    print("No checkpoint to load and creating a new model instance")
+    #model = torch.load(args.checkpoint_dir, map_location = config.device)
     model = SceneLearner(config)
     model.load_state_dict(torch.load(args.checkpoint_dir))
+else:
+    print("No checkpoint to load and creating a new model instance")
+    
+
 
 if args.pretrain_perception:
     model.scene_perception.load_state_dict(torch.load(args.pretrain_perception, map_location = config.device))
