@@ -69,7 +69,7 @@ def train_pointcloud(train_model, config, args, phase = "1"):
     if args.dataset == "Objects3d":
         train_dataset= Objects3dDataset(config, sidelength = 128, stage = int(phase))
 
-    dataloader = DataLoader(train_dataset, batch_size = args.batch_size, shuffle = args.shuffle)
+    dataloader = DataLoader(train_dataset, batch_size = int(args.batch_size), shuffle = args.shuffle)
 
     # [joint training of perception and language]
     alpha = args.alpha
@@ -111,7 +111,8 @@ def train_pointcloud(train_model, config, args, phase = "1"):
             # [Perception Loss]
             perception_loss = 0
             for loss_name in outputs["loss"]:
-                perception_loss += outputs["loss"][loss_name] * config.loss_weights[loss_name]
+                weight = args.loss_weights[loss_name]
+                perception_loss += outputs["loss"][loss_name] * weight
 
             recon_occ = outputs["occ"]
             recon_coord_color = outputs["color"]
@@ -121,8 +122,8 @@ def train_pointcloud(train_model, config, args, phase = "1"):
   
             # [calculate the working loss]
             working_loss = perception_loss * alpha + language_loss * beta
-            epoch_loss += working_loss.detach().numpy()
-
+            try:epoch_loss += working_loss.detach().numpy()
+            except:epoch_loss += working_loss
             # [backprop and optimize parameters]
             for i,losses in enumerate(all_losses):
                 for loss_name,loss in losses.items():
@@ -162,7 +163,7 @@ def train_pointcloud(train_model, config, args, phase = "1"):
         writer.add_scalar("epoch_loss", epoch_loss, epoch)
     print("\n\nExperiment {} : Training Completed.".format(args.name))
 
-weights = {"reconstruction":1.0,"color_reconstruction":1.0,"occ_reconstruction":1.0,"locolization":1.0}
+weights = {"reconstruction":1.0,"color_reconstruction":1.0,"occ_reconstruction":1.0,"localization":1.0}
 
 argparser = argparse.ArgumentParser()
 # [general config of the training]

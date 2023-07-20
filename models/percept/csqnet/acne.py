@@ -3,10 +3,12 @@ import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
 
+a_norm_eps = "eps"
+
 class KoutLayer(nn.Module):
     def __init__(self, inc, num_g, shift=False, outc=None, bn_type="gn"):
         super(KoutLayer, self).__init__()
-        print("num K: {}".format(num_g))
+        #print("num K: {}".format(num_g))
 
         self.conv_att = nn.Conv2d(inc, num_g, 1)        
 
@@ -30,12 +32,12 @@ class KoutLayer(nn.Module):
         # ACN
         a = a[:, None]# B1GN1
 
-        if config.a_norm_eps == "clamp":
+        if a_norm_eps == "clamp":
             pai = a.sum(dim=3, keepdim=True) # B1K11
             a_norm = a / torch.clamp(pai, min=1e-3)
-        elif config.a_norm_eps == "none":
+        elif a_norm_eps == "none":
             a_norm = a / a.sum(dim=3, keepdim=True)
-        elif config.a_norm_eps == "eps":
+        elif a_norm_eps == "eps":
             a_norm = a / (a.sum(dim=3, keepdim=True) + 1e-8)
         else:
             raise NotImplementedError
@@ -54,7 +56,7 @@ class KoutLayer(nn.Module):
 class ACN2dMultiBranch(nn.Module):
     def __init__(self, inc, num_g=1, atten_opt="softmax", rescale=None, eps=1e-3, reg=False, bin_score=None):
         super(ACN2dMultiBranch, self).__init__()
-        print("num_head: {}".format(num_g))
+        #print("num_head: {}".format(num_g))
         self.atten_opt = atten_opt
         self.num_g = num_g
         self.eps = eps
@@ -109,12 +111,12 @@ class ACN2dMultiBranch(nn.Module):
         # ACN
         a = a[:, None] # B1GN1
         
-        if config.a_norm_eps == "clamp":
+        if a_norm_eps == "clamp":
             pai = a.sum(dim=3, keepdim=True) # B1K11
             a_norm = a / torch.clamp(pai, min=1e-3)
-        elif config.a_norm_eps == "none":
+        elif a_norm_eps == "none":
             a_norm = a / a.sum(dim=3, keepdim=True)
-        elif config.a_norm_eps == "eps":
+        elif a_norm_eps == "eps":
             a_norm = a / (a.sum(dim=3, keepdim=True) + 1e-8)
         else:
             raise NotImplementedError
@@ -139,7 +141,7 @@ class ACN2dMultiBranch(nn.Module):
 
 
 class ConvLayer(nn.Module):
-    def __init__(self, inc, outc, cn_type="acn_g", cn_pos="post", bn="gn", reg=False, act="relu", bin_score=None):
+    def __init__(self, inc, outc, cn_type="acn_b", cn_pos="post", bn="gn", reg=False, act="relu", bin_score=None):
         super(ConvLayer, self).__init__()
         self.layer = nn.Sequential()
 
@@ -149,7 +151,7 @@ class ConvLayer(nn.Module):
                 "conv", nn.Conv2d(inc, outc, 1, 1))
             inc = outc
         
-        print("cn_type: {}".format(cn_type))
+        #print("cn_type: {}".format(cn_type))
 
         if cn_type.startswith("acn_b"):
             num_g = int(cn_type.split("-")[-1])
@@ -184,7 +186,7 @@ class ConvLayer(nn.Module):
             pass
         else:
             raise NotImplementedError
-        print("bn type: {}".format(bn))
+        #print("bn type: {}".format(bn))
         if act == "relu":
             self.layer.add_module(
                 "relu", nn.ReLU(inplace=True))
@@ -194,6 +196,10 @@ class ConvLayer(nn.Module):
     def forward(self, x):
         return self.layer(x)
 
+class Sine(nn.Module):
+    def __init__(self):super().__init__()
+
+    def forward(self,x): return torch.sin(x)
 
 class ResBlock(nn.Module):
 
