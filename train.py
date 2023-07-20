@@ -110,8 +110,8 @@ def train_pointcloud(train_model, config, args, phase = "1"):
 
             # [Perception Loss]
             perception_loss = 0
-            for loss in outputs["loss"]:
-                perception_loss += loss 
+            for loss_name in outputs["loss"]:
+                perception_loss += outputs["loss"][loss_name] * config.loss_weights[loss_name]
 
             recon_occ = outputs["occ"]
             recon_coord_color = outputs["color"]
@@ -162,6 +162,7 @@ def train_pointcloud(train_model, config, args, phase = "1"):
         writer.add_scalar("epoch_loss", epoch_loss, epoch)
     print("\n\nExperiment {} : Training Completed.".format(args.name))
 
+weights = {"reconstruction":1.0,"color_reconstruction":1.0,"occ_reconstruction":1.0,"locolization":1.0}
 
 argparser = argparse.ArgumentParser()
 # [general config of the training]
@@ -179,6 +180,7 @@ argparser.add_argument("--perception",              default = "psgnet")
 argparser.add_argument("--training_mode",           default = "joint")
 argparser.add_argument("--alpha",                   default = 10.00)
 argparser.add_argument("--beta",                    default = 0.001)
+argparser.add_argument("--loss_weights",            default = weights)
 
 # [additional training details]
 argparser.add_argument("--warmup",                  default = True)

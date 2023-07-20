@@ -38,6 +38,15 @@ class SceneLearner(nn.Module):
         self.executor = SceneProgramExecutor(config)
         self.rep = config.concept_type
 
+    def _check_nan_gradient(self):
+
+        for param in self.model.parameters():
+            if param.grad is not None:
+                if torch.isnan(param.grad).sum() > 0:
+                    return True 
+                    break
+        return False 
+        
     def parse(self, program):return self.executor.parse(program)
     
     def forward(self, inputs, query = None):
