@@ -28,6 +28,8 @@ class SceneLearner(nn.Module):
         # PointNet Perception Module
         if config.perception in ["point_net","dgcnn"]:
             self.scene_perception = HierarchicalVNN(config)
+        if config.perception in ["csqnet"]:
+            self.scene_perception = CSQNet(config)
 
         # [Concept Structure Embedding]
         self.box_registry = build_box_registry(config)
