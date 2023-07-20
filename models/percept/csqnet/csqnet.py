@@ -4,6 +4,16 @@ from .loss import *
 from .acne import *
 from .decoder import *
 
+def evaluate_pose(x, att):
+    # x: B3N, att: B1KN1
+    # ts: B3k1
+    pai = att.sum(dim=3, keepdim=True) # B1K11
+    att = att / torch.clamp(pai, min=1e-3)
+
+    ts = torch.sum(
+        att * x[:, :, None, :, None], dim=3) # B3K1
+    return ts
+
 class CSQModule(nn.Module):
     def __init__(self, config, num_slots):
         super().__init__()
@@ -26,7 +36,11 @@ class CSQNet(nn.Module):
         self.config = config
         concept_dim = config.concept_dim
         construct = ()
-        self.base_encoder = AcneKpEncoder(config, indim = 4)
+        self.base_encoder = AcneKpEncoder(config, indim = 4) # [Encoder]
+
+        gc_dim = config.acne_dim 
+        self.decoder = KpDecoder(self.config.acne_num_g, gc_dim,
+            self.config.num_pts, self.config)                   # [Decoder]
         self.csq_modules = [CSQModule(config, num_slots) for num_slots in construct]
         if config.concept_projection:
             self.feature2concept = nn.Linear(config.latent_dim, concept_dim)
@@ -39,8 +53,9 @@ class CSQNet(nn.Module):
 
         enc_in = torch.cat([enc_in, inputs['rgb']], 2)[...,None].permute(0,2,1,3)
 
-        f_att = self.base_encoder(enc_in, return_att=True)
+        f_att = self.base_encoder(inputs['point_cloud'] * self.scaling , return_att=True)
         base_feature, attention = f_att
+        pos = evaluate_pose(base_feature, attention)
         base_feature = base_feature.squeeze(3)
         attention = attention.squeeze(1)
         attention = attention.squeeze(3)
