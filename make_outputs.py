@@ -12,7 +12,7 @@ recon_coord_color = np.load("outputs/recon_coord_color.npy")
 
 input_pcs = [(coords * (occ+1)/ 2,coord_color),
              (point_cloud,rgb),
-             (coords * (occ+1)/ 2,recon_coord_color)]
+             (coords * (recon_occ+1)/2,recon_coord_color)]
 
 visualize_pointcloud(input_pcs)
 plt.show()

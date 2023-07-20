@@ -45,3 +45,5 @@ parser.add_argument("--global_feature_dim", default = 66)
 # intuitive physics model and particle filter
 
 config = parser.parse_args(args = [])
+
+def str2bool(x):return x.lower in ("true","1")

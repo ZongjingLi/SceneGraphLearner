@@ -60,14 +60,14 @@ def log_imgs(imsize,pred_img,clusters,gt_img,writer,iter_):
 
 
 def train_pointcloud(train_model, config, args, phase = "1"):
-    assert phase in ["1", "2", "3", "4", "5"],print("not a valid phase")
+    assert phase in ["0", "1", "2", "3", "4", "5",0,1,2,3,4,5],print("not a valid phase")
     query = True if args.training_mode in ["joint", "query"] else False
     print("\nstart the experiment: {} query:[{}]".format(args.name,query))
     print("experiment config: \nepoch: {} \nbatch: {} samples \nlr: {}\n".format(args.epoch,args.batch_size,args.lr))
-    
+
     #[setup the training and validation dataset]
     if args.dataset == "Objects3d":
-        train_dataset= Objects3dDataset(config, sidelength = 128)
+        train_dataset= Objects3dDataset(config, sidelength = 128, stage = int(phase))
 
     dataloader = DataLoader(train_dataset, batch_size = args.batch_size, shuffle = args.shuffle)
 
@@ -110,7 +110,8 @@ def train_pointcloud(train_model, config, args, phase = "1"):
 
             # [Perception Loss]
             perception_loss = 0
-            perception_loss += outputs["loss"]
+            for loss in outputs["loss"]:
+                perception_loss += loss 
 
             recon_occ = outputs["occ"]
             recon_coord_color = outputs["color"]
@@ -138,7 +139,7 @@ def train_pointcloud(train_model, config, args, phase = "1"):
             if not(itrs % args.checkpoint_itrs):
                 name = args.name
                 expr = args.training_mode
-                torch.save(train_model.state_dict(), "checkpoints/{}_{}_{}_{}.pth".format(name,expr,config.domain,config.perception))
+                torch.save(train_model.state_dict(), "checkpoints/{}_{}_{}_{}_phase{}.pth".format(name,expr,config.domain,config.perception,phase))
                 """
                 input_pcs = [(coords[0,:,:] * (occ[0,:,:]+1)/ 2,coord_color[0,:,:]),
                     (point_cloud[0,:,:],rgb[0,:,:]),
@@ -164,10 +165,10 @@ def train_pointcloud(train_model, config, args, phase = "1"):
 
 argparser = argparse.ArgumentParser()
 # [general config of the training]
-argparser.add_argument("--phase",                   default = "1")
+argparser.add_argument("--phase",                   default = "0")
 argparser.add_argument("--device",                  default = config.device)
 argparser.add_argument("--name",                    default = "KFT")
-argparser.add_argument("--epoch",                   default = 400)
+argparser.add_argument("--epoch",                   default = 400 * 3)
 argparser.add_argument("--optimizer",               default = "Adam")
 argparser.add_argument("--lr",                      default = 2e-4)
 argparser.add_argument("--batch_size",              default = 1)
@@ -205,6 +206,7 @@ if args.checkpoint_dir:
     model.load_state_dict(torch.load(args.checkpoint_dir))
 else:
     print("No checkpoint to load and creating a new model instance")
+    model = SceneLearner(config)
     
 
 
@@ -239,5 +241,6 @@ if args.dataset in ["Objects3d"]:
 if args.dataset in ["Sprites","Acherus","Toys","PTR"]:
     print("start the image domain training session.")
     train_image(model, config, args)
+
 
 

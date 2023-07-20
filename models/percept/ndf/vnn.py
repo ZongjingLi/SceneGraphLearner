@@ -144,7 +144,19 @@ class FilterColor(nn.Module):
             # output = torch.softmax(output, 0)
 
         return output, output2
- 
+
+class CanonicalUnit(nn.Module):
+    def __init__(self, config, num_units):
+        super().__init__()
+        hidden_dim = config.hidden_dim
+        kq_dim = 32
+        self.config
+        self.num_units = num_units
+        self.hidden_dim = hidden_dim
+        self.kq_dim = kq_dim
+    
+    def forward(self, x):
+        return x
 
 class HierarchicalVNN(nn.Module):
     def __init__(self, config):
@@ -177,9 +189,13 @@ class HierarchicalVNN(nn.Module):
             outputs['occ_branch'], outputs['features'], outputs['features2'], outputs['color'], outputs['occ'] = self.decoder(inputs['coords'], inputs['occ'], query_points, z)
         else:
             outputs['occ_branch'], outputs['color'], outputs['occ'] = self.decoder(inputs['coords'], inputs['occ'], query_points, z)
-        recon_loss_occ = torch.nn.functional.mse_loss(outputs["occ"],inputs["occ"])
+
+        #print((inputs["occ"]+1)/2)
+        #print(outputs["occ"].unsqueeze(-1))
+        EPS = 1e-6
+        recon_loss_occ = torch.nn.functional.binary_cross_entropy(torch.clamp((inputs["occ"]+1)/2,min=EPS,max=1-EPS),outputs["occ"].unsqueeze(-1))
         recon_loss_color = torch.nn.functional.mse_loss(outputs["color"],inputs["coord_color"])
-        outputs["loss"] = recon_loss_occ + recon_loss_color
+        outputs["loss"] = [recon_loss_occ ,]#recon_loss_color]
         return outputs
 
 class VNNOccNet(nn.Module):

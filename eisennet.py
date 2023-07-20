@@ -7,7 +7,7 @@ from models import *
 from config import *
 
 sidelength = 128
-object3d_dataset = Objects3dDataset(config, sidelength, depth_aug = True, multiview_aug= True)
+object3d_dataset = Objects3dDataset(config, sidelength, depth_aug = True, multiview_aug= True, stage = 1)
 dataloader = DataLoader(object3d_dataset, batch_size = 1, shuffle = True)
 
 for sample in dataloader:
