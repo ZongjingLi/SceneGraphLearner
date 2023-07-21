@@ -5,3 +5,5 @@ logs/events/events.out.tfevents.1680235649.lawn-143-215-84-196.lawn.gatech.edu.9
 *.0
 *.ckpt
 *.zip
+*.pth
+*.npy
