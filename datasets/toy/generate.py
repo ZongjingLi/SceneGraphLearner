@@ -48,7 +48,7 @@ def random_template():
 
 def random_color():
     color = [0, 10, 0]
-    color[np.random.choice([0,2])] = 200
+    color[np.random.choice([0,2])] = 220 + np.random.randint(-20,20)
     return color
 
 def random_coord(margin,resolution = (128,128)):
