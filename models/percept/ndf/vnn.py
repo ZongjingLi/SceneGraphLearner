@@ -195,7 +195,7 @@ class HierarchicalVNN(nn.Module):
         EPS = 1e-6
         recon_loss_occ = torch.nn.functional.binary_cross_entropy(torch.clamp((inputs["occ"]+1)/2,min=EPS,max=1-EPS),outputs["occ"].unsqueeze(-1))
         recon_loss_color = torch.nn.functional.mse_loss(outputs["color"],inputs["coord_color"])
-        outputs["loss"] = {"occ_reconstruction:":recon_loss_occ ,"color_reconstruction":recon_loss_color}
+        outputs["loss"] = {"occ_reconstruction":recon_loss_occ ,"color_reconstruction":recon_loss_color}
         return outputs
 
 class VNNOccNet(nn.Module):

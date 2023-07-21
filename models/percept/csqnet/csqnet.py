@@ -56,6 +56,7 @@ class CSQNet(nn.Module):
         f_att = self.base_encoder(inputs['point_cloud'] * self.scaling , return_att=True)
         base_feature, attention = f_att
         pos = evaluate_pose(base_feature, attention)
+
         base_feature = base_feature.squeeze(3)
         attention = attention.squeeze(1)
         attention = attention.squeeze(3)
