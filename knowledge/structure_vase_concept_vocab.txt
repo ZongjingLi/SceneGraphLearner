@@ -1,0 +1,11 @@
+pot
+body
+container
+containing_things
+liquid_or_soil
+plant
+other
+lid
+base
+foot_base
+foot
