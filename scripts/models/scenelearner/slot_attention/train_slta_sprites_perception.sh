@@ -1,0 +1,1 @@
+/Users/melkor/miniforge3/envs/Melkor/bin/python train.py --dataset="Sprites" --perception="slot_attention" --training_mode="perception" 

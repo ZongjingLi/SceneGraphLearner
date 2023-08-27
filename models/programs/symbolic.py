@@ -6,6 +6,10 @@ import torch.nn.functional as F
 from .abstract_program import AbstractProgram
 from utils import copy_dict,apply,EPS
 
+device = "cuda:0" if torch.cuda.is_available() else "cpu"
+inf = torch.tensor(int(1e8)).to(device)
+EPS = 1e-7
+
 class SymbolicProgram(AbstractProgram):
     def __init__(self, *args):
         super().__init__(*args)
@@ -13,6 +17,7 @@ class SymbolicProgram(AbstractProgram):
         self.registered = None, []
 
     def evaluate(self, box_registry, **kwargs):
+
         p = super(SymbolicProgram,self)._transform(box_registry, **kwargs)
         p.kwargs = copy_dict(kwargs)
         p.registered = self.registered
@@ -92,20 +97,25 @@ class SymbolicProgram(AbstractProgram):
 
 
 class Scene(SymbolicProgram):
-    BIG_NUMBER = 10
+    BIG_NUMBER = 100
     
     def __init__(self, *args):
         super().__init__(*args)
 
     def __call__(self,executor):
+        device = "cuda:0" if torch.cuda.is_available() else "cpu"
         features = executor.kwargs["features"]
         #logit = torch.ones(features.shape[0] ,device = features.device) * self.BIG_NUMBER
-        score = executor.kwargs["end"]
+        scores = executor.kwargs["end"]
 
         scene_tree= executor.kwargs["features"]
-
-        logit = torch.log(score / (1 - score))
-        return {"end":logit}
+        effective_level = executor.effective_level
+        logits = []
+        for i,score in enumerate(scores):
+            #print(i+1,len(score),effective_level)
+            if (i+1<=effective_level):logits.append(torch.log(score / (1 - score)))
+            else:logits.append(torch.log(EPS * torch.ones_like(score).to(device)/(1 - EPS * torch.ones_like(score))))
+        return {"end":logits}
 
 class Unique(SymbolicProgram):
 
@@ -126,16 +136,47 @@ class Filter(SymbolicProgram):
     def __init__(self, *args):
         super().__init__(*args)
         self.child, self.concept = args
+        self.flag = True
 
     def __call__(self, executor):
         child = self.child(executor)
-        mask  = executor.entailment(executor.kwargs["features"],
-            executor.get_concept_embedding(self.concept))
+        tree_masks = [ ]
 
-        filter_logit = torch.min(child["end"], mask)
-        query_object = mask[..., 0].max(-1).indices
-        return {**child, "end": filter_logit, 
-            "feature": executor.kwargs["features"], "query_object": query_object}
+        for i in range(len(child["end"])):
+            level_mask = []
+            #print(executor.kwargs["features"][i].shape)
+            #for feature in executor.kwargs["features"][i]:
+            features = executor.kwargs["features"][i]
+            if not self.flag:
+                mask_value = torch.min(child["end"][i],executor.entailment(features,
+                executor.get_concept_embedding(self.concept)))
+            else:            
+                mask_value = self.get_normalized_prob(child["end"][i],features,self.concept,executor)
+
+                mask_value = mask_value.clamp(EPS, 1-EPS)
+
+                mask_value = torch.log(mask_value/ (1 - mask_value))
+                mask_value = torch.min(child["end"][i], mask_value)
+
+            level_mask.append(mask_value)
+
+            tree_masks.append(torch.cat(level_mask, dim = -1))
+   
+        return {**child, "end": tree_masks, 
+            "feature": executor.kwargs["features"],} #"query_object": query_object}
+
+    def get_normalized_prob(self, end, feat, concept, executor):
+        pdf = []
+        for predicate in executor.concept_vocab:
+            pdf.append(torch.sigmoid(executor.entailment(feat,
+                executor.get_concept_embedding(predicate) )).unsqueeze(0) )
+        
+        pdf = torch.cat(pdf, dim = 0)
+        idx = executor.concept_vocab.index(concept)
+
+        return pdf[idx]/ pdf.sum(dim = 0)
+
+
 
 
 class Relate(SymbolicProgram):
@@ -161,8 +202,10 @@ class Intersect(SymbolicProgram):
     def __call__(self, executor):
         left_child = self.left_child(executor)
         right_child = self.right_child(executor)
-        logit = torch.min(left_child["end"], right_child["end"])
-        return {**left_child, **right_child, "end": logit}
+        tree_logits = [
+            torch.min(left_child["end"][i], right_child["end"][i]) for i in range(len(right_child["end"]))
+        ]
+        return {**left_child, **right_child, "end": tree_logits}
 
 
 class Union(SymbolicProgram):
@@ -174,8 +217,10 @@ class Union(SymbolicProgram):
     def __call__(self, executor):
         left_child = self.left_child(executor)
         right_child = self.right_child(executor)
-        logit = torch.max(left_child["end"], right_child["end"])
-        return {**left_child, **right_child, "end": logit}
+        tree_logits = [
+            torch.max(left_child["end"][i], right_child["end"][i]) for i in range(len(right_child["end"]))
+        ]
+        return {**left_child, **right_child, "end": tree_logits}
 
 
 class Count(SymbolicProgram):
@@ -186,7 +231,8 @@ class Count(SymbolicProgram):
     def __call__(self, executor):
         child = self.child(executor)
         if executor.training:
-            count = torch.sigmoid(child["end"]).sum(-1)
+            count = 0
+            for level in child["end"]:count += torch.sigmoid(level).sum(-1)
         else:
             count = (child["end"] >= 0).sum(-1)
 
@@ -296,6 +342,64 @@ class Exist(SymbolicProgram):
 
     def __call__(self, executor):
         child = self.child(executor)
-        max_logit, query_object = child["end"].max(-1)
+        max_logit = -inf
+        for level in child["end"]:
+            new_logit, query_object = level.max(-1)
+
+            new_logit = new_logit.clamp(-inf,inf)
+            max_logit = torch.max(max_logit, new_logit)
         return {**child, "end": max_logit}
 
+class Parents(SymbolicProgram):
+    def __init__(self, *args):
+        super().__init__(*args)
+        self.child, = args
+
+    def __call__(self, executor):
+        child = self.child(executor); 
+        tree_logits = [score for score in child["end"]]
+        connections = executor.kwargs["connections"]
+        assert len(connections) + 1 == len(child["end"]),\
+            print("Invalid Scene Connection Detected: scene:{} connection:{}".format(len(child["end"]),len(connections)))
+        for i in range(0,len(tree_logits)-1):
+            current_scores = torch.sigmoid(tree_logits[i])
+            path_prob = torch.einsum("mn,n->m",connections[i], current_scores)
+
+            tree_logits[i + 1] = path_prob
+            tree_logits[i + 1] = torch.log(tree_logits[i + 1] / (1 - tree_logits[i + 1]))
+        tree_logits[0] = torch.log(torch.ones([len(tree_logits[0])],device = device) * EPS)
+
+        return {**child, "end": tree_logits}
+
+class Subtree(SymbolicProgram):
+    def __init__(self, *args):
+        super().__init__(*args)
+        self.child, = args
+
+    def __call__(self, executor):
+        child = self.child(executor)
+        tree_logits = child["end"]
+        connections = executor.kwargs["connections"]
+        tree_logits = [score for score in child["end"]]
+        #print(tree_logits)
+        assert len(connections) + 1 == len(child["end"]),\
+            print("Invalid Scene Connection Detected: scene:{} connection:{}".format(len(child["end"]),len(connections)))
+
+        for i in range(len(tree_logits)-1,0,-1):
+            current_scores = torch.sigmoid(tree_logits[i])
+
+            path_prob = torch.einsum("mn,m->n",connections[i - 1], current_scores)
+            path_prob = []
+            for j in range(connections[i-1].shape[1]):
+
+                pb = torch.max(torch.min(connections[i - 1].permute(1,0)[j], current_scores))
+                path_prob.append(pb.unsqueeze(0))
+
+            path_prob = torch.cat(path_prob, dim = -1)
+   
+            
+            tree_logits[i - 1] = path_prob.clamp(EPS,1-EPS)
+            tree_logits[i - 1] = torch.log(tree_logits[i-1] / (1 - tree_logits[i-1]))
+        
+        tree_logits[-1] = torch.log(torch.ones([len(tree_logits[-1])],device = device) * EPS)
+        return {**child, "end": tree_logits}

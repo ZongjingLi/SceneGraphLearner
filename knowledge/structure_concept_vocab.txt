@@ -1,0 +1,8 @@
+chair
+table
+vase
+A
+B
+C 
+docker
+E

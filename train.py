@@ -1,4 +1,8 @@
-from multiprocessing.connection import answer_challenge
+import warnings
+warnings.filterwarnings("ignore")
+
+import tensorflow
+
 import torch
 import argparse 
 import datetime
@@ -10,47 +14,13 @@ from datasets import *
 from config import *
 from models import *
 from visualize.answer_distribution import *
+from visualize.visualize_pointcloud import *
 
 from torch.utils.tensorboard import SummaryWriter
 import torchvision
 from skimage import color
 
-
-class PTRImageDataColab(Dataset):
-    def __init__(self,split="train",resolution = (128,128)):
-        super().__init__()
-        assert split in ["train","test","val"]
-        self.split = split
-        self.root_dir = "/Users/melkor/Documents/datasets/ptr_data/PTR"
-        self.root_dir = ""
-        self.img_transform = transforms.Compose(
-            [transforms.ToTensor()]
-        )
-
-        self.resolution = resolution
-        self.file_names = os.listdir("/content/{}_images/{}_images/".format(split,split))
-
-        if split == "train": # 518110
-            pass
-            #self.ptr_data = load_json("/Users/melkor/Documents/datasets/ptr_data/PTR/train_questions.json")["questions"]
-        elif split == "val":
-            pass
-            #self.ptr_data = load_json("/Users/melkor/Documents/datasets/ptr_data/PTR/val_questions.json")["questions"]
-    def __getitem__(self,index): # 91720
-        #data_bind = self.ptr_data[index]
-        #idx = ("000000" + str(index))[-6:]
-        image_file_name = os.path.join(self.root_dir,"{}_images".format(self.split),"{}_images".format(self.split),self.file_names[index])
-        #question = data_bind['question']
-        #program = data_bind["program"]
-        #answer = data_bind["answer"]
-        image = Image.open(image_file_name).convert()
-        image = image.convert("RGB").resize(self.resolution) 
-        image = self.img_transform(image).permute([1,2,0]) 
-        #return torch.tensor(np.array(image)).float()/256
-        return {"image":image}#"question":question,"answer":answer,"program":program}
-
-    def __len__(self):
-        return len(self.file_names)
+from legacy import *
 
 
 def freeze_parameters(model):
@@ -59,6 +29,14 @@ def freeze_parameters(model):
 def unfreeze_parameters(model):
     for param in model.parameters():
         param.requires_grad = True
+
+def freeze_hierarchy(model, depth):
+    size = len(model.scene_builder)
+    for i in range(1,size+1):
+        if i <= depth:unfreeze_parameters(model.hierarhcy_maps[i-1])
+        else:freeze_parameters(model.scene_builder)
+    model.executor.effective_level = depth
+
 
 def log_imgs(imsize,pred_img,clusters,gt_img,writer,iter_):
 
@@ -87,39 +65,55 @@ def log_imgs(imsize,pred_img,clusters,gt_img,writer,iter_):
     visualize_image_grid(cluster_imgs[batch_size,...], row = 1, save_name = "val_cluster")
     visualize_image_grid(pred_img.reshape(batch_size,imsize,imsize,3)[0,...], row = 1, save_name = "val_recon")
 
-def train(model, config, args):
-    query = True if args.training_mode in ["joint", "query"] else False
+def load_scene(scene, k): 
+    scores = scene["scores"]; features = scene["features"]; connections = scene["connections"]
+    return [score[k] for score in scores], [feature[k] for feature in features], \
+        [connection[k] for connection in connections[1:]]
+
+def train_pointcloud(train_model, config, args, phase = "1"):
+    B = int(args.batch_size)
+    train_model = train_model.to(config.device)
+    train_model.config = config
+    train_model.executor.config = config
+    assert phase in ["0", "1", "2", "3", "4", "5",0,1,2,3,4,5],print("not a valid phase")
+    query = False if args.phase in ["0",0] else True
+    clip_grads = query
     print("\nstart the experiment: {} query:[{}]".format(args.name,query))
     print("experiment config: \nepoch: {} \nbatch: {} samples \nlr: {}\n".format(args.epoch,args.batch_size,args.lr))
-    
+    if args.phase in ["1",1]: args.loss_weights["equillibrium"] = 0.01
     #[setup the training and validation dataset]
-    if args.dataset == "ptr":
-        train_dataset = PTRData("train", resolution = config.resolution)
-        val_dataset =  PTRData("val", resolution = config.resolution)
-    if args.dataset == "toy":
-        if query:
-            train_dataset = ToyDataWithQuestions("train", resolution = config.resolution)
-        else:
-            train_dataset = ToyData("train", resolution = config.resolution)
 
-    if args.training_mode == "query":
-        freeze_parameters(model.scene_perception.backbone)
+    if args.dataset == "Objects3d":
+        train_dataset= Objects3dDataset(config, sidelength = 128, stage = int(phase))
+    if args.dataset == "StructureNet":
+        if args.phase in ["0",]:
+            train_dataset = StructureDataset(config, category = "vase")
+        if args.phase in ["1","2","3","4"]:
+            train_dataset = StructureGroundingDataset(config, category = args.category, split = "train", phase = "1")
+    
+    #train_dataset = StructureGroundingDataset(config, category="vase", split = "train")
+    dataloader = DataLoader(train_dataset, batch_size = int(args.batch_size), shuffle = args.shuffle)
 
-    dataloader = DataLoader(train_dataset, batch_size = args.batch_size, shuffle = args.shuffle)
 
     # [joint training of perception and language]
     alpha = args.alpha
     beta  = args.beta
-    if args.training_mode == "query":alpha = 0
-    if args.training_mode == "perception":beta = 0
+    if args.training_mode == "query":alpha = 1
+    if args.training_mode == "perception":beta = 1
     
 
     # [setup the optimizer and lr schedulr]
     if args.optimizer == "Adam":
-        optimizer = torch.optim.Adam(model.parameters(), lr = args.lr)
+        optimizer = torch.optim.Adam(train_model.parameters(), lr = args.lr)
     if args.optimizer == "RMSprop":
-        optimizer = torch.optim.RMSprop(model.parameters(), lr = args.lr)
+        optimizer = torch.optim.RMSprop(train_model.parameters(), lr = args.lr)
 
+    if args.freeze_perception:
+         print("freezed the perception module: True")
+         freeze_parameters(train_model.part_perception)
+    if phase not in ["0"]:
+       freeze_hierarchy(train_model,int(phase))
+         
     # [start the training process recording]
     itrs = 0
     start = time.time()
@@ -129,264 +123,196 @@ def train(model, config, args):
     if not os.path.exists(ckpt_dir): os.makedirs(ckpt_dir)
     if not os.path.exists(events_dir): os.makedirs(events_dir)
     writer = SummaryWriter(events_dir)
-
+    max_gradient = 1000.
     for epoch in range(args.epoch):
+        epoch_loss = 0
         for sample in dataloader:
-            
+            sample, gt = sample
             # [perception module training]
-            gt_ims = torch.tensor(sample["image"].numpy()).float().to(config.device)
 
-            outputs = model.scene_perception(gt_ims)
-            recons, clusters, all_losses = outputs["recons"],outputs["clusters"],outputs["losses"]
+            outputs = train_model.part_perception(sample)
+            all_losses = {}
 
-
+            # [Perception Loss]
             perception_loss = 0
+            for loss_name in outputs["loss"]:
+                weight = args.loss_weights[loss_name]
+                perception_loss += outputs["loss"][loss_name] * weight
+            components = outputs["components"]
 
-            for i,pred_img in enumerate(recons[:]):
-                perception_loss += torch.nn.functional.l1_loss(pred_img.flatten(), gt_ims.flatten())
-            
-
-            # [language query module training]
+            # [Language Loss]
             language_loss = 0
             if query:
-                for question in sample["question"]:
-                    for b in range(len(question["program"])):
-                        program = question["program"][b] # string program
-                        answer  = question["answer"][b]  # string answer
+                features,masks,positions = outputs["features"],outputs["masks"],outputs["positions"] 
 
-                        abstract_scene  = outputs["abstract_scene"]
-                        top_level_scene = abstract_scene[-1]
+                qa_programs = sample["programs"]
+                answers = sample["answers"]
 
-                        working_scene = [top_level_scene]
+                features = train_model.feature2concept(features)
+                if config.concept_type == "box" and False:
 
-                        scores   = top_level_scene["masks"][b,...] - EPS
+                    features = torch.cat([
+                        features, 
+                        EPS * torch.ones(B,features.shape[1],config.concept_dim)\
+                        ],dim = -1)
+                #print(features.shape)
+                scene = train_model.build_scene(features)
 
-                        features = top_level_scene["features"][b]
+            
+                for b in range(features.shape[0]):
+                    scores,features,connections = load_scene(scene, b)
 
+                    kwargs = {"features":features,
+                    "end":scores,
+                    "connections":connections}
 
-                        edge = 1e-6
-                        if config.concept_type == "box":
-                            features = torch.cat([features,edge * torch.ones(features.shape)],-1)
+                    for i,q in enumerate(qa_programs):
+                        answer = answers[i][b]
 
-                        kwargs = {"features":features,
-                                  "end":scores }
+                        q = train_model.executor.parse(q[0])
 
-                        q = model.executor.parse(program)
                         
-                        o = model.executor(q, **kwargs)
-                        #print("Batch:{}".format(b),q,o["end"],answer)
-                        if answer in numbers and len(q)>2:
-                            int_num = torch.tensor(numbers.index(answer)).float().to(config.device)
-                            language_loss += F.mse_loss(int_num + 1,o["end"])
-                        if answer in yes_or_no:
-                            if answer == "yes":language_loss -= F.logsigmoid(o["end"])
-                            else:language_loss -= torch.log(1 - torch.sigmoid(o["end"]))
-
-            # [calculate the working loss]
-            working_loss = perception_loss * alpha + language_loss * beta
-
-            # [backprop and optimize parameters]
-            optimizer.zero_grad()
-            working_loss.backward()
-            optimizer.step()
-
-            for i,losses in enumerate(all_losses):
-                for loss_name,loss in losses.items():
-                    writer.add_scalar(str(i)+loss_name, loss, itrs)
-            writer.add_scalar("working_loss", working_loss, itrs)
-            writer.add_scalar("perception_loss", perception_loss, itrs)
-            writer.add_scalar("language_loss", language_loss, itrs)
-
-            if not(itrs % args.checkpoint_itrs):
-                name = args.name
-                expr = args.training_mode
-                torch.save(model, "checkpoints/{}_{}_{}_{}.ckpt".format(name,expr,config.domain,config.perception))
-                log_imgs(config.imsize,pred_img.cpu().detach(), clusters, gt_ims.reshape([args.batch_size,config.imsize ** 2,3]).cpu().detach(),writer,itrs)
-                
-                visualize_image_grid(gt_ims.flatten(start_dim = 0, end_dim = 1).cpu().detach(), row = args.batch_size, save_name = "ptr_gt_perception")
-                visualize_image_grid(gt_ims[0].cpu().detach(), row = 1, save_name = "val_gt_image")
-
-                visualize_psg(gt_ims[0:1].cpu().detach(), outputs["abstract_scene"], args.effective_level)
-
-            itrs += 1
-
-            sys.stdout.write ("\rEpoch: {}, Itrs: {} Loss: {} Percept:{} Language:{}, Time: {}".format(epoch + 1, itrs, working_loss,perception_loss,language_loss,datetime.timedelta(seconds=time.time() - start)))
-    
-    print("\n\nExperiment {} : Training Completed.".format(args.name))
-
-
-
-def train_TBC(model, config, args):
-    name = args.name
-    dataset = PTRImageDataColab("train")
-    if args.training_mode == "joint":
-        try:
-            print("object score allowed")
-            model.scene_perception.allow_obj_score()
-        except:pass
-
-    print("Joint!")
-
-    logging_root = "./logs"
-    ckpt_dir     = os.path.join(logging_root, 'checkpoints')
-    events_dir   = os.path.join(logging_root, 'events')
-    if not os.path.exists(ckpt_dir): os.makedirs(ckpt_dir)
-    if not os.path.exists(events_dir): os.makedirs(events_dir)
-
-    # setup the checkpoint location and initalize the SummaryWritter
-    writer = SummaryWriter(events_dir)
-
-    if args.optimizer == "Adam":
-        optimizer = torch.optim.Adam(model.parameters(), lr = args.lr)
-    if args.optimizer == "RMSprop":
-        optimizer = torch.optim.RMSprop(model.parameters(), lr = args.lr)
-    dataloader = DataLoader(dataset, batch_size = args.batch_size, shuffle = args.shuffle)
-    
-
-    itrs = 0
-    start = time.time() # record the start time of the training
-    for epoch in range(args.epoch):
-        total_loss = 0
-        for sample in dataloader:
-
-            # check to engage in warmup training 
-            if args.warmup and itrs < args.warmup_steps:
-                learning_rate = args.lr * ((1 + itrs)/args.warmup_steps)
-            else:
-                learning_rate = args.lr
-
-            optimizer.param_groups[0]["lr"] = learning_rate # setup the lr params
-
-            working_loss = 0
-            # execute the model according to the training mode
-            if True or args.training_mode == "perception" or args.training_mode == "joint":
-                inputs = sample["image"].to(args.device)
-                gt_ims = inputs
-                try:outputs = model.scene_perception(inputs)
-                except:outputs = model(inputs)
-
-                # get the components
-                full_recon = outputs["full_recons"]
-                recons     = outputs["recons"]
-                masks      = outputs["masks"]
-                loss       = outputs["loss"]
-                if args.training_mode != "query":
-                    working_loss += loss * 1000
-
-            if args.training_mode == "query" or args.training_mode == "joint":
-                query_loss = 0
-                for question in sample["question"]:
-                    for b in range(len(question["program"])):
-                        program = question["program"][b] # string program
-                        answer  = question["answer"][b]  # string answer
-
-                        scores   = outputs["object_scores"][b,...,0] - EPS
-                        features = outputs["object_features"][b]
-
-                        edge = 1e-6
-                        if config.concept_type == "box":
-                            features = torch.cat([features,edge * torch.ones(features.shape, device = args.device)],-1)
-
-                        kwargs = {"features":features,
-                                  "end":scores }
-
-                        q = model.executor.parse(program)
+                        o = train_model.executor(q, **kwargs)
                         
-                        o = model.executor(q, **kwargs)
-                        #print("Batch:{}".format(b),q,o["end"],answer)
+
+                        if answer in ["True","False"]:answer = {"True":"yes,","False":"no"}[answer]
+                        if answer in ["1","2","3","4","5"]:answer = num2word(int(answer))
                         
                         if answer in numbers:
                             int_num = torch.tensor(numbers.index(answer)).float().to(args.device)
-                            query_loss += F.mse_loss(int_num + 1,o["end"])
-                            if itrs % args.checkpoint_itrs == 0:
-                                print(q,answer)
-                                answer_distribution_num(o["end"].cpu().detach().numpy(),1+int_num.cpu().detach().numpy())
+                            language_loss += F.mse_loss(int_num ,o["end"])
+                            
                         if answer in yes_or_no:
-                            if answer == "yes":query_loss -= F.logsigmoid(o["end"])
-                            else:query_loss -= torch.log(1 - torch.sigmoid(o["end"]))
-                            if itrs % args.checkpoint_itrs == 0:
-                                print(q,answer)
-                                answer_distribution_binary(F.sigmoid(o["end"]).cpu().detach().numpy())
-                        #print(scores.float().detach().numpy())
+                            if answer == "yes":
+                                language_loss -= torch.log(torch.sigmoid(o["end"]))
+                            else:
+                                language_loss -= torch.log(1 - torch.sigmoid(o["end"]))
+                        #language_loss += (1 + torch.sigmoid( (o["end"] + g) )/r)
 
-                working_loss += query_loss * 0.003
+            # [calculate the working loss]
 
-             # calculate the working loss of the batch
+            working_loss = perception_loss + language_loss
+            try:epoch_loss += working_loss.detach().numpy()
+            except:epoch_loss += working_loss
+            # [backprop and optimize parameters]
+            for i,losses in enumerate(all_losses):
+                for loss_name,loss in losses.items():
+                    writer.add_scalar(str(i)+loss_name, loss, itrs)
 
-            # back propagation to update the working loss
             optimizer.zero_grad()
             working_loss.backward()
+            if clip_grads and 0:
+                torch.nn.utils.clip_grad_norm(train_model.executor.parameters() , -max_gradient, max_gradient)
             optimizer.step()
-            total_loss += working_loss.detach()
 
-            sys.stdout.write ("\rEpoch: {}, Itrs: {} Loss: {}, Time: {}".format(epoch + 1, itrs, working_loss,datetime.timedelta(seconds=time.time() - start)))
+            writer.add_scalar("working_loss", working_loss, itrs)
+            writer.add_scalar("perception_loss", perception_loss , itrs)
+            writer.add_scalar("language_loss", language_loss, itrs)
 
-            if itrs % args.checkpoint_itrs == 0:
-                writer.add_scalar("working_loss", working_loss, itrs)
-                if args.training_mode == "perception":
-                    torch.save(model.scene_perception,"checkpoints/{}_{}_{}.ckpt".format(name,config.domain,config.perception))
+            if not(itrs % args.checkpoint_itrs):
+                if query:
+                    print("")
+                    for i,q in enumerate(qa_programs):
+                        answer = answers[i][b]
+                        q = train_model.executor.parse(q[0])
+                        o = train_model.executor(q, **kwargs)
+                        if answer in ["True","False"]:answer = {"True":"yes,","False":"no"}[answer]
+                        if answer in ["1","2","3","4","5"]:answer = num2word(int(answer))
+                        
+                        if answer in numbers:
+                            int_num = torch.tensor(numbers.index(answer)).float().to(args.device)
+                            language_loss += +F.mse_loss(int_num ,o["end"])
+                            print(q,answer,"mse:",float(F.mse_loss(int_num,o["end"]).detach().numpy()))
+                        if answer in yes_or_no:
+                            if answer == "yes":
+                                language_loss -= torch.log(torch.sigmoid(o["end"]))
+                                print(q,answer,"p:",float(torch.sigmoid(o["end"])))
+                            else:
+                                language_loss -= torch.log(1 - torch.sigmoid(o["end"]))
+                                print(q,answer,"p:",float(1 - torch.sigmoid(o["end"])))
+
+                    scene_tree_path = sample["scene_tree"][-1]
+                    scene_tree = nx.read_gpickle(scene_tree_path)
+                    plt.figure("Comparison",figsize=(14,6))
+                    plt.subplot(121)
+                    plt.cla()
+                    pos = nx.layout.spring_layout(scene_tree)
+                    nx.draw_networkx(scene_tree,pos)
+                    plt.subplot(122)
+                    visualize_output_trees(scores, features, connections, model.executor, kwargs)
+                    plt.pause(0.001)
+
+                name = args.name
+                expr = args.training_mode
+                field_class = "3dpc"
+                if 1:
+                    torch.save(train_model.state_dict(),\
+                        "checkpoints/scenelearner/{}/{}_{}_{}_{}_phase{}.pth".format(field_class,name,expr,config.domain,config.perception,phase))
+                    torch.save(train_model,\
+                        "checkpoints/scenelearner/{}/{}_{}_{}_{}_phase{}.ckpt".format(field_class,name,expr,config.domain,config.perception,phase))
                 else:
-                    torch.save(model,"checkpoints/{}_joint_{}_{}.ckpt".format(name,config.domain,config.perception))
-                if args.training_mode == "joint" or args.training_mode == "query":
-                    writer.add_scalar("qa_loss", query_loss, itrs)
-                writer.add_scalar("vision_loss", loss, itrs)
-                if True or args.training_mode == "perception" or args.training_mode == "joint":
-                    # load the images, reconstructions, and other thing
-                    num_slots = recons.shape[1]
+                    torch.save(train_model.part_perception.state_dict(),"checkpoints/{}_part_percept_{}_{}_{}_phase{}.pth".format(name,expr,config.domain,config.perception,phase))
+                if args.dataset == "Objects3d":
+                    point_cloud = sample["point_cloud"]
+                    rgb = sample["rgb"]
+                    coords = sample["coords"]
+                    occ = sample["occ"]
+                    coord_color = sample["coord_color"]
+                    np.save("outputs/point_cloud.npy",np.array(point_cloud[0,:,:].cpu()))
+                    np.save("outputs/rgb.npy",np.array(rgb[0,:,:].cpu()))
+                    np.save("outputs/coords.npy",np.array(coords[0,:,:].cpu()))
+                    np.save("outputs/occ.npy",np.array(occ[0,:,:].cpu()))
+                    np.save("outputs/coord_color.npy",np.array(coord_color[0,:,:].cpu()))
 
-                    recon_grid = torchvision.utils.make_grid(recons.cpu().detach().permute([0,1,4,2,3]).flatten(start_dim = 0, end_dim = 1),normalize=True,nrow=num_slots)
-                    writer.add_image("Recons",recon_grid.cpu().detach().numpy(),itrs)
-    
-                    masks_grid = torchvision.utils.make_grid(masks.cpu().detach().permute([0,1,4,2,3]).flatten(start_dim = 0, end_dim = 1),normalize=True,nrow=num_slots)
-                    writer.add_image("Masks",masks_grid.cpu().detach().numpy(),itrs)
+                    recon_occ = outputs["occ"]
+                    recon_coord_color = outputs["color"]
+                    np.save("outputs/recon_occ.npy",np.array(recon_occ[0,:].cpu().unsqueeze(-1).detach()))
+                    np.save("outputs/recon_coord_color.npy",np.array(recon_coord_color[0,:,:].cpu().detach()))
+                if args.dataset == "StructureNet":
+                    recon_pc = outputs["recon_pc"][0]
+                    point_cloud = sample["point_cloud"][0]
+                    masks = outputs["masks"][0]
+                    np.save("outputs/recon_point_cloud.npy",np.array(recon_pc.cpu().detach()))
+                    np.save("outputs/point_cloud.npy",np.array(point_cloud.cpu().detach()))
+                    np.save("outputs/masks.npy",np.array(masks.cpu().detach()))
 
-                    comps_grid = torchvision.utils.make_grid((recons*masks).cpu().detach().permute([0,1,4,2,3]).flatten(start_dim = 0, end_dim = 1),normalize=True,nrow=num_slots)
-                    writer.add_image("Components",comps_grid.cpu().detach().numpy(),itrs)
+                    if components is not None:
+                        np.save("outputs/splits.npy",np.array(components.cpu().detach()))
 
-                    grid = torchvision.utils.make_grid(full_recon.cpu().detach().permute([0,3,1,2]),normalize=True,nrow=args.batch_size)
-                    writer.add_image("Full Recons",grid.cpu().detach().numpy(),itrs)
-
-                    gt_grid = torchvision.utils.make_grid(sample["image"].cpu().detach().permute([0,3,1,2]),normalize=True,nrow=args.batch_size)
-                    writer.add_image("GT Image",gt_grid.cpu().detach().numpy(),itrs)
-
-                    writer.add_image("Backup",gt_grid.cpu().detach().numpy(),itrs)    
-
-                    visualize_outputs(inputs,outputs)
-
-                    visualize_scores(outputs["object_scores"][0:1,:,0].cpu().detach().numpy(), name="val_scores")   
-
-                    visualize_image_grid(gt_ims[0].cpu().detach(), row = 1, save_name = "val_gt_image")
-                    visualize_image_grid(full_recon[0].cpu().detach(), row = 1, save_name = "val_recon_image")
+                    # Save Components
                     
-
-                    single_comps =  torchvision.utils.make_grid((recons*masks)[0:1].cpu().detach().permute([0,1,4,2,3]).flatten(start_dim = 0, end_dim = 1),normalize=True,nrow=num_slots).permute(1,2,0)
-                    visualize_image_grid(single_comps.cpu().detach(), row = 1, save_name = "comps")
-
             itrs += 1
-        total_loss = total_loss/len(dataloader)
-        writer.add_scalar("epoch_loss",total_loss,epoch)
 
+            sys.stdout.write ("\rEpoch: {}, Itrs: {} Loss: {} Percept:{} Language:{}, Time: {}".format(epoch + 1, itrs, working_loss,perception_loss,language_loss,datetime.timedelta(seconds=time.time() - start)))
+        writer.add_scalar("epoch_loss", epoch_loss, epoch)
     print("\n\nExperiment {} : Training Completed.".format(args.name))
 
+weights = {"reconstruction":1.0,"color_reconstruction":1.0,"occ_reconstruction":1.0,"localization":1.0,"chamfer":1.0,"equillibrium_loss":1.0}
 
 argparser = argparse.ArgumentParser()
 # [general config of the training]
+argparser.add_argument("--phase",                   default = "0")
 argparser.add_argument("--device",                  default = config.device)
 argparser.add_argument("--name",                    default = "KFT")
-argparser.add_argument("--epoch",                   default = 1000)
+argparser.add_argument("--epoch",                   default = 400 * 3)
 argparser.add_argument("--optimizer",               default = "Adam")
-argparser.add_argument("--lr",                      default = 2e-4)
-argparser.add_argument("--batch_size",              default = 2)
+argparser.add_argument("--lr",                      default = 1e-3)
+argparser.add_argument("--batch_size",              default = 1)
 argparser.add_argument("--dataset",                 default = "toy")
+argparser.add_argument("--category",                default = ["vase"])
+argparser.add_argument("--freeze_perception",       default = False)
+argparser.add_argument("--concept_type",            default = False)
 
 # [perception and language grounding training]
+argparser.add_argument("--perception",              default = "psgnet")
 argparser.add_argument("--training_mode",           default = "joint")
-argparser.add_argument("--alpha",                   default = 1.000)
-argparser.add_argument("--beta",                    default = 0.001)
+argparser.add_argument("--alpha",                   default = 1.00)
+argparser.add_argument("--beta",                    default = 1.0)
+argparser.add_argument("--loss_weights",            default = weights)
 
 # [additional training details]
 argparser.add_argument("--warmup",                  default = True)
-argparser.add_argument("--warmup_steps",            default = 3000)
+argparser.add_argument("--warmup_steps",            default = 300)
 argparser.add_argument("--decay",                   default = False)
 argparser.add_argument("--decay_steps",             default = 20000)
 argparser.add_argument("--decay_rate",              default = 0.99)
@@ -397,30 +323,61 @@ argparser.add_argument("--effective_level",         default = 1)
 
 # [checkpoint location and savings]
 argparser.add_argument("--checkpoint_dir",          default = False)
-argparser.add_argument("--checkpoint_itrs",         default = 500)
+argparser.add_argument("--checkpoint_itrs",         default = 10,       type=int)
 argparser.add_argument("--pretrain_perception",     default = False)
 
 args = argparser.parse_args()
 
+config.perception = args.perception
+if args.concept_type: config.concept_type = args.concept_type
+args.freeze_perception = bool(args.freeze_perception)
+args.lr = float(args.lr)
+
+
 if args.checkpoint_dir:
-    model = torch.load(args.checkpoint_dir, map_location = config.device)
+    #model = torch.load(args.checkpoint_dir, map_location = config.device)
+    model = SceneLearner(config)
+    if "ckpt" in args.checkpoint_dir[-4:]:
+        model = torch.load(args.checkpoint_dir, map_location = args.device)
+    else: model.load_state_dict(torch.load(args.checkpoint_dir, map_location=args.device))
 else:
     print("No checkpoint to load and creating a new model instance")
-    if args.name == "TBC":
-        config.perception = "slot_attention"
-        model = SceneLearner(config)
-    else:
-        model = SceneLearner(config)
+    model = SceneLearner(config)
+model = model.to(args.device)
+
 
 if args.pretrain_perception:
-  pass    
-model.scene_perception = torch.load("/content/checkpoints/PTRObjects_toy_slot_attention.ckpt", map_location=args.device)
+    model.load_state_dict(torch.load(args.pretrain_perception, map_location = config.device))
 
-model.scene_perception.slot_attention.iters = 7
-model = model.to(config.device)
+def build_perception(size,length,device):
+    edges = [[],[]]
+    for i in range(size):
+        for j in range(size):
+            # go for all the points on the grid
+            coord = [i,j];loc = i * size + j
+            
+            for r in range(1):
+                random_long_range = torch.randint(128, (1,2) )[0]
+                edges[0].append(random_long_range[0] // size)
+                edges[1].append(random_long_range[1] % size)
+            for dx in range(-length,length+1):
+                for dy in range(-length,length+1):
+                    if i+dx < size and i+dx>=0 and j+dy<size and j+dy>=0:
+                        if 1 and (i+dx) * size + (j + dy) != loc:
+                            edges[0].append(loc)
+                            edges[1].append( (i+dx) * size + (j + dy))
+    return torch.tensor(edges).to(device)
 
-train_TBC(model, config, args)
-if args.name == "TBC":
-    train_TBC(model, config, args)
-else:
-    train(model, config, args)
+print("using perception: {} knowledge:{} dataset:{}".format(args.perception,config.concept_type,args.dataset))
+
+
+if args.dataset in ["Objects3d","StructureNet"]:
+    print("start the 3d point cloud model training.")
+    train_pointcloud(model, config, args, phase = args.phase)
+
+if args.dataset in ["Sprites","Acherus","Toys","PTR"]:
+    print("start the image domain training session.")
+    train_image(model, config, args)
+
+
+

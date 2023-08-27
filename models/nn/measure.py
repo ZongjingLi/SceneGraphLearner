@@ -10,7 +10,9 @@ class Measure(nn.Module):
         self.dim = config.concept_dim
         self.temperature = config.temperature
 
-    def forward(self, x):return torch.sum(torch.log(self.softplus(x[..., self.dim:])), dim=-1)
+    def forward(self, x):
+        
+        return torch.sum(torch.log(self.softplus(x[..., self.dim:])), dim=-1)
 
     def measure_along_axis(self, x):
         return self.softplus(x[..., self.dim:])

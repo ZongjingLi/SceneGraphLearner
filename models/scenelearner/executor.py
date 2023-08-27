@@ -38,8 +38,13 @@ class SceneProgramExecutor(nn.Module):
 
         # [Word Vocab]
         concept_vocab = []
-        with open("knowledge/{}_concept_vocab.txt".format(config.domain)) as vocab:
-            for concept_name in vocab:concept_vocab.append(concept_name.strip())
+        if isinstance(config.category,list):
+            for cat in config.category:
+                with open(config.root + "/knowledge/{}_{}_concept_vocab.txt".format(config.domain,cat)) as vocab:
+                    for concept_name in vocab:concept_vocab.append(concept_name.strip())
+        else:
+            with open(config.root + "/knowledge/{}_concept_vocab.txt".format(config.domain)) as vocab:
+                for concept_name in vocab:concept_vocab.append(concept_name.strip())
 
         self.concept_vocab = concept_vocab
         
@@ -62,7 +67,6 @@ class SceneProgramExecutor(nn.Module):
 
     def forward(self, q, **kwargs):
         self.kwargs = kwargs
-
         return q(self)
 
     def parse(self,string, translator = None):

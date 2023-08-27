@@ -211,16 +211,16 @@ class FeatureDecoder(nn.Module):
         # x (bs, 32, image_h, image_w)
 
         x = self.conv1(x);x = self.celu(x) * 1.0
-        x = torch.clamp(x, min = -320000, max = 320000)
+        x = torch.clamp(x, min = -32000, max = 32000)
         # x = self.bn1(x)
         x = self.conv2(x);x = self.celu(x) * 1.0#self.celu(x)
-        x = torch.clamp(x, min = -320000, max = 320000)
+        x = torch.clamp(x, min = -32000, max = 32000)
         # x = self.bn2(x)
         x = self.conv3(x);x = self.celu(x) * 1.0
-        x = torch.clamp(x, min = -320000, max = 320000)
+        x = torch.clamp(x, min = -32000, max = 32000)
         # x = self.bn3(x)
         x = self.conv4(x);x = self.celu(x) * 1.0
-        x = torch.clamp(x, min = -320000, max = 320000)
+        x = torch.clamp(x, min = -32000, max = 32000)
         #x = self.bn4(x)
 
         img = self.conv5_img(x)
@@ -272,9 +272,9 @@ class SlotAttentionParser(nn.Module):
         self.num_slots = num_slots # the number of objects and backgrounds in the scene
         self.object_dim = object_dim # the dimension of object level after the projection
 
-        self.encoder_net = FeatureMapEncoder(input_nc = 3,z_dim = 128)
-        self.slot_attention = SlotAttention(num_slots,128,128,num_iters)
-        self.decoder_net = FeatureDecoder(128,3,object_dim)
+        self.encoder_net = FeatureMapEncoder(input_nc = 3,z_dim = 256)
+        self.slot_attention = SlotAttention(num_slots,256,256,num_iters)
+        self.decoder_net = FeatureDecoder(256,3,object_dim)
         self.use_obj_score = False
 
         
@@ -314,7 +314,7 @@ class SlotAttentionParser(nn.Module):
         # slots: [b,K,C] attn: [b,N,C]
   
         # decoder model: make reconstructions and masks based on the 
-        img, logitmasks, object_features, object_scores= self.decoder_net(slots.view([-1,128]))
+        img, logitmasks, object_features, object_scores= self.decoder_net(slots.view([-1,256]))
         
         object_features = object_features.view([b,self.num_slots,-1])
         object_scores   = object_scores.view([b,self.num_slots,1])
@@ -328,8 +328,9 @@ class SlotAttentionParser(nn.Module):
         else:
             recons = torch.sum( img * masks,1)
         loss = torch.mean((recons-image) ** 2) # the mse loss of the reconstruction
-        
-        outputs = {"full_recons":recons.permute([0,2,3,1]),
+        scene =  [{"scores":object_scores,"features":object_features,"masks":masks.permute([0,1,3,4,2]),"match":False,"recons":img.permute([0,1,3,4,2])}]
+        outputs = {"abstract_scene":scene,
+                "full_recons":recons.permute([0,2,3,1]),
                 "masks":masks.permute([0,1,3,4,2]),
                 "recons":img.permute([0,1,3,4,2]),
                 "loss":loss,
@@ -500,7 +501,7 @@ class SlotAttentionParser64(nn.Module):
         # slots: [b,K,C] attn: [b,N,C]
 
         # decoder model: make reconstructions and masks based on the 
-        img, logitmasks, object_features, object_scores= self.decoder_net(slots.view([-1,128]))
+        img, logitmasks, object_features, object_scores= self.decoder_net(slots.view([-1,72]))
         
         object_features = object_features.view([b,self.num_slots,-1])
         object_scores   = object_scores.view([b,self.num_slots,1])

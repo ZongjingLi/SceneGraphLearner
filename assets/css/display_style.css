@@ -1,0 +1,78 @@
+.compare_grid {
+    display: grid;
+    grid-template-columns: 2fr 3fr;
+}
+
+header {
+    text-align:center;
+}
+
+.recon {
+    text-align:center;
+}
+
+body {
+    background-color: rgb(255, 255, 255);
+    
+    color: #4a4a4a;
+    font-family: 'open-sans', sans-serif;
+    font-size: 16px;
+    line-height: 1.2;
+
+}
+
+.image-block {
+    opacity: 0.8;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+
+    color: #fff;
+    padding: 4px 7px;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    margin-top:1%;
+  }
+.image-block img {
+    
+  }
+
+.image-block:hover {
+    opacity: 1.0;
+    transition: .5s;
+    cursor:pointer;
+
+}
+
+.image-container {
+    
+    background-color: #ffffff;
+    border-width: 1px;
+    border-style: solid;
+    border-radius: 10px;
+    padding: 20px;
+    border-color: #eaeaea;
+    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.05);
+    position: relative;
+    max-width: 25%;
+    max-width: 100%;
+    max-height: 100%;
+    display: block;
+    margin: auto;
+}
+
+.input-grid {
+    display: grid;
+    grid-template-columns: 2fr 2fr;
+}
+
+.structure-grid {
+    display: grid;
+    grid-template-rows: 1fr 1fr;
+
+}
+
+.vis-tree {
+    margin-left: 17%;
+}

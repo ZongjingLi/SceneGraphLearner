@@ -11,6 +11,60 @@ from .primary import *
 
 device = "cuda:0" if torch.cuda.is_available() else "cpu"
 
+class ControlBasedAggregation(torch.nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.Type = "P1"
+    def affinities_and_thresholds(self, nodes, row, col):
+        # Norm of difference for every node pair on grid
+        edge_affinities = torch.linalg.norm(nodes[row] - nodes[col],dim = 1) 
+
+        # Inverse mean affinities for each node to threshold each edge with
+        inv_mean_affinity = scatter_mean(edge_affinities, row.to(nodes.device))
+        affinity_thresh   = torch.min(inv_mean_affinity[row],
+                                      inv_mean_affinity[col])
+        return edge_affinities.to(device), affinity_thresh.to(device), {}
+
+
+    def forward(self, x, edge_index, batch, device=device):
+
+
+        row, col = edge_index
+
+        # Collect affinities/thresholds to filter edges 
+
+        affinities, threshold, losses = self.affinities_and_thresholds(x,row,col)
+
+        if self.Type == "P1":
+            filtered_edge_index = edge_index[:, affinities <= threshold]
+        if self.Type == "P2":
+            filtered_edge_index = edge_index[:, affinities <= threshold]
+            
+
+        # Coarsen graph with filtered adj. list to produce next level's nodes
+        x = x.to(device)
+
+        if x.size(0) != 0:
+            try:
+                node_labels    = LP_clustering(x.size(0), filtered_edge_index, 30).to(device)
+            except:
+                node_labels = torch.arange(x.size(0))
+        else:
+            node_labels = torch.arange(x.size(0))
+        
+        #node_labels    = LP_clustering(x.size(0), filtered_edge_index, 40).to(device)
+        cluster_labels = node_labels.unique(return_inverse=True,sorted=False)[1].to(device)
+
+        coarsened_x, coarsened_batch = max_pool_x(cluster_labels, x, batch)
+
+        # [Very Suceptible Step, Why use this way to coarse edges]
+        coarsened_edge_index = coalesce(cluster_labels[filtered_edge_index],
+                              None, coarsened_x.size(0), coarsened_x.size(0))[0]
+
+        return (coarsened_x, coarsened_edge_index, coarsened_batch,
+                                                         cluster_labels, losses)
+
+
 class AffinityConditionedAggregation(torch.nn.Module, ABC):
 
     # Takes in tensor of node pairs and returns an affinity tensor and a 
@@ -43,7 +97,7 @@ class AffinityConditionedAggregation(torch.nn.Module, ABC):
 
         if x.size(0) != 0:
             try:
-                node_labels    = LP_clustering(x.size(0), filtered_edge_index, 70).to(device)
+                node_labels    = LP_clustering(x.size(0), filtered_edge_index, 30).to(device)
             except:
                 node_labels = torch.arange(x.size(0))
         else:
@@ -54,7 +108,7 @@ class AffinityConditionedAggregation(torch.nn.Module, ABC):
 
         coarsened_x, coarsened_batch = max_pool_x(cluster_labels, x, batch)
 
-        # [Very Sucptible Step, Why use this way to coarse edges]
+        # [Very Suceptible Step, Why use this way to coarse edges]
         coarsened_edge_index = coalesce(cluster_labels[filtered_edge_index],
                               None, coarsened_x.size(0), coarsened_x.size(0))[0]
 
@@ -104,6 +158,7 @@ class P1AffinityAggregation(AffinityConditionedAggregation):
         affinity_thresh   = torch.min(inv_mean_affinity[row],
                                       inv_mean_affinity[col])
         return edge_affinities.to(device), affinity_thresh.to(device), {}
+
 
 def LP_clustering(num_nodes,edge_index,num_iter=50,device=device):
 

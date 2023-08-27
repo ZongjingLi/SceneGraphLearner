@@ -1,0 +1,1 @@
+/Users/melkor/miniforge3/envs/Melkor/bin/python train.py --name="Sprites" --perception="valkyr" --training_mode="joint" 
