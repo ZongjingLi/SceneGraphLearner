@@ -25,7 +25,7 @@ parser.add_argument("--domain",             default = "structure")
 parser.add_argument("--category",           default = ["vase"])
 
 # setup the perception module
-parser.add_argument("--perception",         default = "csqnet")
+parser.add_argument("--perception",         default = "valkyr")
 parser.add_argument("--perception_size",    default = 7)
 parser.add_argument("--imsize",             default = 128)
 parser.add_argument("--resolution",         default = (128,128))

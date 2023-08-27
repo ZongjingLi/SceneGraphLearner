@@ -23,21 +23,14 @@ class SceneLearner(nn.Module):
         if config.perception == "local_psgnet":
             self.scene_perception = ControlSceneGraphNet(config)
         if config.perception == "valkyr":
-            self.scene_perception = None
-            self.part_perception = ValkyrNet(config)
-            
+            self.scene_perception = ValkyrNet(config)
+            self.part_perception = None
+
             #self.scene_perception = ValkyrNet(config) #EisenNet(config) #ConstructNet(config)
         if config.perception == "slot_attention":
             self.scene_perception = SlotAttentionParser(config.object_num, config.object_dim,5)
             self.part_perception = SlotAttention(config.part_num, config.object_dim,5)
 
-        # PointNet Perception Module
-        if config.perception in ["point_net","dgcnn"]:
-            self.scene_perception = None
-            self.part_perception = HierarchicalVNN(config)
-        if config.perception in ["csqnet"]:
-            self.scene_perception = None
-            self.part_perception = CSQNet(config)
 
         # [Concept Structure Embedding]
         self.box_registry = build_box_registry(config)
@@ -45,19 +38,8 @@ class SceneLearner(nn.Module):
         self.executor = SceneProgramExecutor(config)
         self.rep = config.concept_type
 
-        # [Hierarchy Structure Network]
-        self.scene_builder = nn.ModuleList([HierarchyBuilder(config, slot_num) \
-            for slot_num in config.hierarchy_construct])
-        self.is_box = False
-        if self.is_box:
-            self.hierarhcy_maps = nn.ModuleList([FCBlock(128,2,config.concept_dim,config.concept_dim)\
-            for _ in range(len(config.hierarchy_construct)) ])
-        else:
-            self.hierarhcy_maps = nn.ModuleList([FCBlock(128,2,config.concept_dim,config.concept_dim)\
-            for _ in range(len(config.hierarchy_construct)) ])
-        self.feature2concept = nn.Linear(131,config.concept_dim)
         self.effective_level = "all"
-        self.box_dim = config.concept_dim
+
     
     
     def build_scene(self,input_features):

@@ -46,5 +46,13 @@ class ValkyrNet(nn.Module):
         self.conv2object_feature = None
     
     def forward(self,x):
-        
-        return x
+        outputs = {}
+        B,W,H,C = x.shape # input shape
+        print(self.spatial_coords.shape)
+        print(self.spaital_edges.shape)
+        grid_conv_feature = self.grid_convs(x.permute(0,3,1,2))
+        coords_added_conv_feature = torch.cat(
+            [grid_conv_feature, self.spatial_coords.unsqueeze(1).repeat(B,1,1,1)], dim = 1
+        )
+
+        return outputs

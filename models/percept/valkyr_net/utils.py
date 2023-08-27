@@ -19,9 +19,9 @@ def build_perception(size,length,device):
                             edges[1].append( (i+dx) * size + (j + dy))
     return torch.tensor(edges).to(device)
 
-def grid(width, height):
+def grid(width, height, device = "cuda:0" if torch.cuda.is_available() else "cpu"):
     x = torch.linspace(0,1,width)
     y = torch.linspace(0,1,height)
     grid_x, grid_y = torch.meshgrid(x, y, indexing='ij')
-    return torch.cat([grid_x,grid_y], dim = 0)
+    return torch.cat([grid_x.unsqueeze(0),grid_y.unsqueeze(0)], dim = 0).permute(1,2,0)
     
