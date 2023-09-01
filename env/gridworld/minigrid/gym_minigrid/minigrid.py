@@ -1256,7 +1256,7 @@ class MiniGridEnv(gym.Env):
             return
 
         if mode == 'human' and not self.window:
-            from hacl.envs.gridworld.minigrid.gym_minigrid.window import Window
+            from env.gridworld.minigrid.gym_minigrid.window import Window
 
             self.window = Window('gym_minigrid')
             self.window.show(block=False)
