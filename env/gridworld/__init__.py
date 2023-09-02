@@ -1,1 +1,1 @@
-from .minigrid import *
+from tinyenv import *
