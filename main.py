@@ -81,6 +81,7 @@ argparser.add_argument("--effective_level",         default = 1)
 argparser.add_argument("--checkpoint_dir",          default = False)
 argparser.add_argument("--checkpoint_itrs",         default = 10,       type=int)
 argparser.add_argument("--pretrain_perception",     default = False)
+argparser.add_argument("--visualize_batch",         default = 2)
 
 args = argparser.parse_args()
 

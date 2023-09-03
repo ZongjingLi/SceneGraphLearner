@@ -73,6 +73,17 @@ def build_scene_tree(perception_outputs):
         all_kwargs.append(kwargs)
     return all_kwargs
 
+def collect_qa_batch(batch_qa):
+    batch_wise_qa = []
+    for b in range(len(batch_qa[0]["program"])):
+        questions_in_batch = {"question":[],"program":[],"answer":[]}
+        for qpair in batch_qa:
+            questions_in_batch["question"].append(qpair["question"][b])
+            questions_in_batch["program"].append(qpair["program"][b])
+            questions_in_batch["answer"].append(qpair["answer"][b])
+        batch_wise_qa.append(questions_in_batch)
+    return batch_wise_qa
+
 def train_scenelearner(train_model, config, args):
     IGNORE_KEY = True
     train_model = train_model.to(config.device)
@@ -100,7 +111,7 @@ def train_scenelearner(train_model, config, args):
         train_dataset = AcherusDataset("train")
 
     if args.training_mode == "query":
-        freeze_parameters(train_model.scene_perception.backbone)
+        freeze_parameters(train_model.scene_perception)
 
     dataloader = DataLoader(train_dataset, batch_size = args.batch_size, shuffle = args.shuffle); B = args.batch_size
 
@@ -140,21 +151,64 @@ def train_scenelearner(train_model, config, args):
                 perception_loss += loss_item * loss_weight
 
             # [Calculate the Language Loss]
+        
+
             language_loss = 0.0
             if query: # do something about the query
                 # [Visualize Predicate Segmentation]
+                batch_qa_data = collect_qa_batch(sample["question"])
                 batch_kwargs = build_scene_tree(perception_outputs)
-                programs = ["exist(scene())","exist(filter(scene(),plant))"]
-                for b in range(B):
+                
+                qa_summary = ""
+
+                for b in range(input_images.shape[0]):
+                    qa_summary += "\n\nBatch:{}\n".format(b)
+                    questions = batch_qa_data[b]["question"]
+                    programs = batch_qa_data[b]["program"]
+                    answers = batch_qa_data[b]["answer"]
                     kwargs = batch_kwargs[b]
-                    q = programs[b]
-                    q = model.executor.parse(q)
-                    o = model.executor(q, **kwargs)
-                    # [Visualize the Output Mask Scene Tree]
-                    if not(itrs % args.checkpoint_itrs):
-                        save_name = "answer_distribution"
-                        answer_distribution_binary(o["end"].sigmoid().cpu().detach(),save_name)
-                        plt.cla()
+                    batch_total_qa = 0
+                    batch_correct_qa = 0
+                    for i,q in enumerate(questions):
+                        qa_summary += "\n"
+                        question = questions[i]
+                        q = programs[i]
+                        q = train_model.executor.parse(q)
+                        o = train_model.executor(q, **kwargs)
+                        answer = answers[i]
+                        qa_summary += "\n" + question + "\n"
+                        qa_summary += programs[i] + "\n"
+
+                        if answer in ["True","False"]:answer = {"True":"yes,","False":"no"}[answer]
+                        if answer in ["1","2","3","4","5","6","7","8","9"]:answer = num2word(int(answer))
+
+                        if answer in numbers:
+                            int_num = torch.tensor(numbers.index(answer)).float().to(args.device)
+                            language_loss +=  F.mse_loss(int_num,o["end"])
+                            predict_answer = answer#num2word(int(o["end"]))
+
+                            if itrs % args.checkpoint_itrs == 0:
+                                answer_distribution_num(o["end"].cpu().detach().numpy(),int_num.cpu().detach().numpy())
+
+                        if answer in yes_or_no:
+                            if answer == "yes":language_loss -= torch.log(torch.sigmoid(o["end"]))
+                            else:language_loss -= torch.log(1 - torch.sigmoid(o["end"]))
+                            if torch.sigmoid(o["end"]) > 0.5:
+                                predict_answer = "yes"
+                            else:predict_answer = "no"
+    
+                            if itrs % args.checkpoint_itrs == 0:
+                                save_name = "b{}_q{}_answer_distribution".format(b,q)
+                                answer_distribution_binary(o["end"].sigmoid().cpu().detach(),save_name)
+    
+                        if predict_answer == answer:
+                            batch_correct_qa += 1
+                        batch_total_qa += 1
+                        qa_summary += "\ngt_answer: {}\n\npd_answer:{}\n".format(answer,predict_answer)
+                    qa_summary += "\n Acc:{} = {}/{}\n\n".format(float(batch_correct_qa)/float(batch_total_qa),\
+                                                        batch_correct_qa,batch_total_qa)
+                if itrs % args.checkpoint_itrs == 0:
+                    writer.add_text("Language Summary",qa_summary, itrs)
             
             # [Overall Joint Loss of Perception and Language]
             working_loss = perception_loss+ language_loss # calculate the overall working loss of the system
@@ -170,11 +224,15 @@ def train_scenelearner(train_model, config, args):
             writer.add_scalar("language_loss", language_loss, itrs)
 
             if not(itrs % args.checkpoint_itrs): # [Visualzie Outputs] always visualize all the batch
-                for b in range(B):
+                for b in range(args.visualize_batch):
                     for i,recon in enumerate(perception_outputs["reconstructions"]):
-                        curr_recon = recon[b,...]
+                        curr_recon = recon[b,...].cpu().detach()
                         save_name = "batch{}_recon_layer{}.png".format(b, i + 1)
-                        visualize_image_grid(curr_recon.permute(0,3,1,2), 1, save_name)
+                        visualize_image_grid(curr_recon.permute(0,3,1,2), curr_recon.shape[0], save_name)
+                        writer.add_images("batch{}_layer{}".format(b, i + 1),curr_recon.permute(0,3,1,2),itrs)
+
+                visualize_image_grid(input_images.permute(0,3,1,2),B,"input_image.png")
+                writer.add_images("input_image",input_images.permute(0,3,1,2),itrs)
 
             itrs += 1
 
