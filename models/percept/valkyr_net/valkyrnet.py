@@ -3,20 +3,236 @@ import torch.nn as nn
 from types import SimpleNamespace
 
 from .utils import *
-from .convs import *
+from models.nn.primary import *
 
 
-class GNNSoftPooling(nn.Module):
-    def __init__(self, output_node_num = 10):
-        super().__init__()
-        
-    
+class RDB_Conv(nn.Module):
+    def __init__(self, inChannels, growRate, kSize=3):
+        super(RDB_Conv, self).__init__()
+        Cin = inChannels
+        G  = growRate
+        self.conv = nn.Sequential(*[
+            nn.Conv2d(Cin, G, kSize, padding=(kSize-1)//2, stride=1),
+            nn.ReLU(),
+        ])
+
     def forward(self, x):
+        out = self.conv(x)
+        return torch.cat((x, out), 1)
+
+class RDB(nn.Module):
+    def __init__(self, growRate0, growRate, nConvLayers, kSize=3):
+        super(RDB, self).__init__()
+        G0 = growRate0
+        G  = growRate
+        C  = nConvLayers
+
+        convs = []
+        for c in range(C):
+            convs.append(RDB_Conv(G0 + c*G, G))
+        self.convs = nn.Sequential(*convs)
+
+        # Local Feature Fusion
+        self.LFF = nn.Conv2d(G0 + C*G, G0, 1, padding=0, stride=1)
+
+    def forward(self, x):
+        return self.LFF(self.convs(x)) + x
+
+class RDN(nn.Module):
+    def __init__(self, args):
+        super(RDN, self).__init__()
+        self.args = args
+        r = args.scale[0]
+        G0 = args.G0
+        kSize = args.RDNkSize
+
+        # number of RDB blocks, conv layers, out channels
+        self.D, C, G = args.RDNconfig
+        """
+        {
+            'A': (20, 6, 32),
+            'B': (16, 8, 64),
+        }[args.RDNconfig]
+        """
+
+        # Shallow feature extraction net
+        self.SFENet1 = nn.Conv2d(args.n_colors, G0, kSize, padding=(kSize-1)//2, stride=1)
+        self.SFENet2 = nn.Conv2d(G0, G0, kSize, padding=(kSize-1)//2, stride=1)
+
+        # Redidual dense blocks and dense feature fusion
+        self.RDBs = nn.ModuleList()
+        for i in range(self.D):
+            self.RDBs.append(
+                RDB(growRate0 = G0, growRate = G, nConvLayers = C)
+            )
+
+        # Global Feature Fusion
+        self.GFF = nn.Sequential(*[
+            nn.Conv2d(self.D * G0, G0, 1, padding=0, stride=1),
+            nn.Conv2d(G0, G0, kSize, padding=(kSize-1)//2, stride=1)
+        ])
+
+        if args.no_upsampling:
+            self.out_dim = G0
+        else:
+            self.out_dim = args.n_colors
+            # Up-sampling net
+            if r == 2 or r == 3:
+                self.UPNet = nn.Sequential(*[
+                    nn.Conv2d(G0, G * r * r, kSize, padding=(kSize-1)//2, stride=1),
+                    nn.PixelShuffle(r),
+                    nn.Conv2d(G, args.n_colors, kSize, padding=(kSize-1)//2, stride=1)
+                ])
+            elif r == 4:
+                self.UPNet = nn.Sequential(*[
+                    nn.Conv2d(G0, G * 4, kSize, padding=(kSize-1)//2, stride=1),
+                    nn.PixelShuffle(2),
+                    nn.Conv2d(G, G * 4, kSize, padding=(kSize-1)//2, stride=1),
+                    nn.PixelShuffle(2),
+                    nn.Conv2d(G, args.n_colors, kSize, padding=(kSize-1)//2, stride=1)
+                ])
+            else:
+                raise ValueError("scale must be 2 or 3 or 4.")
+
+    def forward(self, x):
+        f__1 = self.SFENet1(x)
+        x  = self.SFENet2(f__1)
+
+        RDBs_out = []
+        for i in range(self.D):
+            x = self.RDBs[i](x)
+            RDBs_out.append(x)
+
+        x = self.GFF(torch.cat(RDBs_out,1))
+        x += f__1
+
+        if self.args.no_upsampling:
+            return x
+        else:
+            return self.UPNet(x)
+
+class GraphConvolution(nn.Module):
+
+    def __init__(self, input_feature_num, output_feature_num, add_bias=True, dtype=torch.float,
+                 batch_normal=True):
+        super().__init__()
+        # shapes
+
+        self.input_feature_num = input_feature_num
+        self.output_feature_num = output_feature_num
+        self.add_bias = add_bias
+        self.batch_normal = batch_normal
+
+        # params
+        self.weight = nn.Linear( input_feature_num, self.output_feature_num)
+        self.bias = nn.Parameter(torch.zeros(self.output_feature_num,dtype=dtype))
+        self.transform = nn.Linear(self.output_feature_num, self.output_feature_num)
+        
+        self.sparse = True
+        #self.batch_norm = nn.BatchNorm1d(num_features = input_feature_num)
+            
+    def set_trainable(self, train=True):
+        for param in self.parameters():
+            param.requires_grad = train
+
+    def forward(self, x, adj):
+        """
+        @param inp : adjacent: (batch, graph_num, graph_num) cat node_feature: (batch, graph_num, in_feature_num) -> (batch, graph_num, graph_num + in_feature_num)
+        @return:
+        """
+        B, N, D = x.shape
+        node_feature = x
+
+        x = self.weight(node_feature)
+        #x = torch.nn.functional.normalize(x,p = 1.0, dim = -1, eps = 1e-5)
+
+        if self.sparse or isinstance(adj, torch.SparseTensor):
+            x = torch.spmm(adj,x[0]).unsqueeze(0)
+        else:
+            x = torch.matmul(adj,x[0])
+        #if self.add_bias:
+        #x = x + self.bias.unsqueeze(0).unsqueeze(0).repeat(B,N,1)
+
+        #x = self.transform(x)
+
+        #x = torch.nn.functional.normalize(x,p = 1.0, dim = -1, eps = 1e-5)
+
         return x
 
-class ObjectRender(nn.Module):
-    def __init__(self,):
+class GNNSoftPooling(nn.Module):
+    def __init__(self, input_feat_dim, output_node_num = 10):
         super().__init__()
+        self.assignment_net = GraphConvolution(input_feat_dim, output_node_num)
+        self.feature_net =   GraphConvolution(input_feat_dim, input_feat_dim) 
+    
+    def forward(self, x, adj):
+        B,N,D = x.shape
+        # B,N,N = adj.shape
+        if isinstance(adj, list):
+            output_node_features = []
+            output_new_adj = []
+            output_s_matrix = []
+            for i in range(len(adj)):
+                s_matrix = self.assignment_net(x[i:i+1], adj[i]) #[B,N,M]
+                
+                s_matrix = torch.softmax(s_matrix , dim = 2)#.clamp(0.0+eps,1.0-eps)
+            
+                node_features = self.feature_net(x[i:i+1],adj[i]) #[B,N,D]
+                node_features = torch.einsum("bnm,bnd->bmd",s_matrix,node_features) #[B,M,D]
+                # [Calculate New Cluster Adjacency]
+
+                adj[i] = torch.Tensor.to_dense(adj[i])
+                #print("smt,adj",s_matrix.max(),s_matrix.min(), adj[i].max(), adj[i].min())
+                #print(adj[i].shape, s_matrix.shape)
+                new_adj = torch.spmm(
+                    torch.spmm(
+                        s_matrix[0].permute(1,0),adj[i]
+                        ),s_matrix[0])
+                #print("new_adj",new_adj[i].max(), new_adj[i].min())
+
+                output_node_features.append(node_features)
+                output_new_adj.append(new_adj)
+                output_s_matrix.append(s_matrix)
+
+            output_node_features = torch.cat(output_node_features, dim = 0)
+            output_s_matrix = torch.cat(output_s_matrix, dim = 0)
+        return output_node_features,output_new_adj,output_s_matrix
+
+def get_fourier_feature(grid, term = 7):
+    output_feature = []
+    for k in range(term):
+        output_feature.append(torch.sin(grid * (k + 1)))
+        output_feature.append(torch.cos(grid * (k + 1)))
+    output_feature = torch.cat(output_feature, dim = -1)
+    return output_feature
+
+class ObjectRender(nn.Module):
+    def __init__(self,config, conv_feature_dim):
+        super().__init__()
+        channel_dim = config.channel
+        spatial_dim = config.spatial_dim
+        fourier_dim = config.fourier_dim
+
+        self.conv_feature_dim = conv_feature_dim
+        self.render_block  = FCBlock(128,2,conv_feature_dim + spatial_dim + spatial_dim + 2*spatial_dim*fourier_dim,channel_dim)
+
+    def forward(self, latent, grid):
+        B,N,D = latent.shape
+        if len(grid.shape) == 4:
+            # grid: [B,W,H,2]
+            B, W, H, _ = grid.shape
+            expand_latent = latent.unsqueeze(2).unsqueeze(2)
+            expand_latent = expand_latent.repeat(1,1,W,H,1)
+            grid = grid.unsqueeze(1)
+            grid = grid.repeat(1,N,1,1,1)
+        if len(grid.shape) == 3:
+            # grid: [B,WH,2]
+            B, WH, _ = grid.shape
+            grid = grid.unsqueeze(1).repeat(1,N,1,1)
+            expand_latent = latent.unsqueeze(2).repeat(1,1,WH,1)
+        cat_feature = torch.cat([grid, expand_latent], dim = -1)
+        return self.render_block(cat_feature)
+
 
 class ValkyrNet(nn.Module):
     def __init__(self, config):
@@ -28,31 +244,145 @@ class ValkyrNet(nn.Module):
         self.perception_size = config.perception_size
         # build the connection graph for the grid domain
         self.spatial_coords = grid(self.imsize,self.imsize,device=device)
+        self.spatial_fourier_features = get_fourier_feature(self.spatial_coords, term = config.fourier_dim)
         self.spatial_edges =  build_perception(self.imsize,self.perception_size,device = device)
-
         # [Grid Convs]
         conv_feature_dim = config.conv_feature_dim
-        self.grid_convs =RDN(SimpleNamespace(G0=conv_feature_dim  ,RDNkSize=3,n_colors=3,RDNconfig=(4,3,16),scale=[2],no_upsampling=True))
+        self.grid_convs = RDN(SimpleNamespace(G0=conv_feature_dim  ,RDNkSize=3,n_colors=3,RDNconfig=(4,3,16),scale=[2],no_upsampling=True))
         
         # [Diff Pool Construction]
-        hierarchy_nodes = config.hierarchy_construct
+        hierarchy_nodes = config.hierarchy_construct 
         self.diff_pool = nn.ModuleList([
-            GNNSoftPooling(output_node_num = node_num ) for node_num in hierarchy_nodes
+            GNNSoftPooling(input_feat_dim = conv_feature_dim+2,output_node_num = node_num ) for node_num in hierarchy_nodes
         ])
+        
 
         # [Render Fields]
-        self.render_fields = nn.ModuleList([])
+        self.render_fields = nn.ModuleList([ObjectRender(config,conv_feature_dim) for _ in hierarchy_nodes])
 
-        self.conv2object_feature = None
+        self.conv2object_feature = nn.Linear(conv_feature_dim + 2, config.object_dim)
+        self.device = "cuda:0" if torch.cuda.is_available() else "cpu"
     
-    def forward(self,x):
+    def forward(self, x, verbose = 0):
         outputs = {}
         B,W,H,C = x.shape # input shape
-        print(self.spatial_coords.shape)
-        print(self.spaital_edges.shape)
-        grid_conv_feature = self.grid_convs(x.permute(0,3,1,2))
-        coords_added_conv_feature = torch.cat(
-            [grid_conv_feature, self.spatial_coords.unsqueeze(1).repeat(B,1,1,1)], dim = 1
-        )
 
+        # [Grid Convolution] produce initial feature in the grid domain 
+        grid_conv_feature = self.grid_convs(x.permute(0,3,1,2))
+        _,_,_,D = grid_conv_feature.shape
+        coords_added_conv_feature = torch.cat(
+            [grid_conv_feature, self.spatial_coords.unsqueeze(0).repeat(B,1,1,1)], dim = 3
+        )
+        if verbose:print("coords_added_conv_feature:{}x{}x{}x{}".format(*list(coords_added_conv_feature.shape) ))
+
+        coords_added_conv_feature = coords_added_conv_feature.reshape(B,W*H,(D+2))
+        coords_added_conv_feature = F.normalize(coords_added_conv_feature, dim = -1)
+       
+        # [DiffPool] each layer performs differentiable [Pn invariant] pooling 
+
+        convs_features = []
+        cluster_assignments = []
+        curr_x = coords_added_conv_feature # base layer feature
+  
+        curr_edges = [self.spatial_edges for _ in range(B)] # base layer edges
+        convs_features.append(curr_x)
+        entropy_regular = 0 # initialize the entropy loss
+        scene_tree = {
+            "x":[curr_x],
+            "object_features":[self.conv2object_feature(curr_x)],
+            "object_scores":[torch.ones(B,curr_x.shape[1]).to(self.device)],
+            "connections":[],
+            "edges":[self.spatial_edges]}
+
+        layer_reconstructions = []
+        for i,graph_pool in enumerate(self.diff_pool):
+            curr_x, curr_edges, assignment_matrix = graph_pool(curr_x, curr_edges)
+            B,N,M = assignment_matrix.shape
+            assignment_matrix = torch.min(scene_tree["object_scores"][-1].unsqueeze(2).repeat(1,1,M), assignment_matrix)
+
+            
+            cluster_assignments.append(assignment_matrix)
+            convs_features.append(curr_x)
+
+            # [Scene Reconstruction]
+            syn_grid = torch.cat([self.spatial_coords ,self.spatial_fourier_features], dim = -1).unsqueeze(0).repeat(B,1,1,1)
+
+            layer_recons = self.render_fields[i](
+                curr_x,
+                syn_grid
+                )
+
+            if verbose: print("reconstruction with shape: ", layer_recons.shape)
+            layer_reconstructions.append(layer_recons)
+            
+            if verbose:print(assignment_matrix.max(),assignment_matrix.min(), curr_edges[0].shape, curr_edges[0].max(), curr_edges[0].min())
+            
+            # [Regular Entropy Term]
+            
+            exist_prob = torch.max(assignment_matrix,dim = 1).values
+            entropy_regular += assignment_entropy(assignment_matrix)
+            #print(exist_prob.shape, scene_tree["object_scores"][-1].shape, assignment_matrix.shape)
+            
+
+            # load results to the scene tree
+            scene_tree["x"].append(curr_x)
+            scene_tree["object_features"].append(self.conv2object_feature(curr_x))
+            scene_tree["object_scores"].append(exist_prob)
+            scene_tree["connections"].append(assignment_matrix)
+            scene_tree["edges"].append(curr_edges)
+
+        # [Calculate Reconstruction at Each Layer]
+        reconstruction_loss = 0.0
+        outputs["reconstructions"] = []
+        for recons in layer_reconstructions:
+            N = recons.shape[1]
+            layer_recon_loss = torch.nn.functional.mse_loss(recons, x.unsqueeze(1).repeat(1,N,1,1,1))
+            reconstruction_loss += layer_recon_loss
+            outputs["reconstructions"].append(recons)
+
+        # [Output the Scene Tree]
+        outputs["scene_tree"] = scene_tree
+
+        # [Add all the loss terms]
+        outputs["losses"] = {"entropy":entropy_regular,"reconstruction":reconstruction_loss}
         return outputs
+
+def assignment_entropy(s_matrix):
+    # s_matrix: B,N,M
+    EPS = 1e-6
+    output_entropy = 0
+    for i in range(s_matrix.shape[-1]):
+        input_tensor = s_matrix[:i,:].clamp(EPS, 1-EPS)
+        lsm = nn.LogSoftmax(dim = -1)
+        log_probs = lsm(input_tensor)
+        probs = torch.exp(log_probs)
+        p_log_p = log_probs * probs
+        entropy = -p_log_p.mean()
+        output_entropy += entropy
+    output_entropy = 0.0
+    return output_entropy
+
+def localization_loss(adj, s_matrix):
+    pass
+
+def build_perception(size,length,device):
+    edges = [[],[]]
+    for i in range(size):
+        for j in range(size):
+            # go for all the points on the grid
+            coord = [i,j];loc = i * size + j
+
+            for dx in range(-length,length+1):
+                for dy in range(-length,length+1):
+                    if i+dx < size and i+dx>=0 and j+dy<size and j+dy>=0:
+                        if (i+dx) * size + (j + dy) != loc:
+                            edges[0].append(loc)
+                            edges[1].append( (i+dx) * size + (j + dy))
+    outputs = torch.sparse_coo_tensor(edges, torch.ones(len(edges[0])), size = (size**2, size**2))
+    return outputs.to(device)
+
+def grid(width, height, device = "cuda:0" if torch.cuda.is_available() else "cpu"):
+    x = torch.linspace(0,1,width)
+    y = torch.linspace(0,1,height)
+    grid_x, grid_y = torch.meshgrid(x, y, indexing='ij')
+    return torch.cat([grid_x.unsqueeze(0),grid_y.unsqueeze(0)], dim = 0).permute(1,2,0)

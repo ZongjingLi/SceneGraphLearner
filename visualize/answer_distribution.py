@@ -10,7 +10,7 @@ def visualize_image_grid(images, row, save_name = "image_grid"):
     plt.tick_params(left = False, right = False , labelleft = False ,
                 labelbottom = False, bottom = False)
 
-    comps_grid = torchvision.utils.make_grid(images,normalize=True,nrow=row)
+    comps_grid = torchvision.utils.make_grid(images,normalize=True,nrow=row).permute(1,2,0)
     
     plt.imshow(comps_grid.cpu().detach().numpy())
     plt.savefig("outputs/{}.png".format(save_name), bbox_inches='tight', pad_inches=0)
@@ -206,6 +206,37 @@ def answer_distribution_num(count, target, name = "answer_distribution"):
     
     plt.savefig("outputs/{}.png".format(name))
     
+
+def visualize_tree(scores, connections, scale = 1.2):
+    fig = plt.figure("tree-visualize",frameon = False)
+    plt.tick_params(left = False, right = False , labelleft = False ,
+                labelbottom = False, bottom = False)
+    plt.axis("off")
+    x_locs = []; y_locs = []
+    for i,score in enumerate(reversed(scores)):
+        num_nodes = len(score)
+        # calculate scores each node
+        #print(score.sigmoid())
+        #score = (score.sigmoid() + 0.5).int()
+        #scores = score.sigmoid()
+        score = torch.clamp(score,0.05,1)
+
+        y_positions = [-scale*(i+1) / 2.0] * num_nodes
+        x_positions = np.linspace(-scale**(i+1), scale**(i+1), num_nodes)
+        if num_nodes == 1: x_positions = [0.0]
+        x_locs.append(x_positions); y_locs.append(y_positions)
+        
+        plt.scatter(x_positions, y_positions, alpha = score, color = 'white', linewidths=2.0)
+    for k,connection in enumerate(reversed(connections)):
+        connection = connection
+        
+        lower_node_num = len(x_locs[k])
+        upper_node_num = len(x_locs[k+1])
+        for i in range(lower_node_num):
+            for j in range(upper_node_num):
+                plt.plot( [x_locs[k][i],x_locs[k+1][j]], [y_locs[k][i], y_locs[k+1][j]], color = "white" ,alpha = float(connection[j][i]))
+    plt.tick_params(left = False, right = False , labelleft = False ,
+                labelbottom = False, bottom = False)
 
 def answer_distribution_binary(score, name = "answer_distribution"):
     batch_size = 1
