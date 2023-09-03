@@ -88,6 +88,7 @@ def train_scenelearner(train_model, config, args):
     IGNORE_KEY = True
     train_model = train_model.to(config.device)
     query = True if args.training_mode in ["joint","query"] else False
+    print("\nstart the experiment: {} query:[{}]".format(args.name,query))
     print("\nTrain the Scene Learner Model-[{}] on [{}]".format(args.perception,args.dataset))
 
     print("experiment config: \nepoch: {} \nbatch: {} samples \nlr: {}\n".format(args.epoch,args.batch_size,args.lr))
@@ -136,6 +137,7 @@ def train_scenelearner(train_model, config, args):
         epoch_loss = 0.
         for sample in dataloader:
             input_images = sample["image"]
+            actual_batch_size = input_images.shape[0]
             # [Perform Image Level Perception]
             perception_outputs = train_model.scene_perception(input_images) # 
 
@@ -151,8 +153,6 @@ def train_scenelearner(train_model, config, args):
                 perception_loss += loss_item * loss_weight
 
             # [Calculate the Language Loss]
-        
-
             language_loss = 0.0
             if query: # do something about the query
                 # [Visualize Predicate Segmentation]
@@ -224,15 +224,28 @@ def train_scenelearner(train_model, config, args):
             writer.add_scalar("language_loss", language_loss, itrs)
 
             if not(itrs % args.checkpoint_itrs): # [Visualzie Outputs] always visualize all the batch
-                for b in range(args.visualize_batch):
+                scene_tree = perception_outputs["scene_tree"]
+
+                scene_tree_ims = []
+                for b in range(min(args.visualize_batch, actual_batch_size)):
+                    vis_scores = [score[b].detach() for score in scene_tree["object_scores"][1:]]
+                    vis_connections = [connect[b] for connect in scene_tree["connections"][1:]]
+                    visualize_tree(vis_scores, vis_connections, scale = 1.618, file_name = "outputs/scene_tree{}.png".format(b))
+
                     for i,recon in enumerate(perception_outputs["reconstructions"]):
                         curr_recon = recon[b,...].cpu().detach()
                         save_name = "batch{}_recon_layer{}.png".format(b, i + 1)
                         visualize_image_grid(curr_recon.permute(0,3,1,2), curr_recon.shape[0], save_name)
                         writer.add_images("batch{}_layer{}".format(b, i + 1),curr_recon.permute(0,3,1,2),itrs)
+                    scene_tree_ims.append(torch.tensor(plt.imread("outputs/scene_tree{}.png".format(b))).unsqueeze(0))
 
                 visualize_image_grid(input_images.permute(0,3,1,2),B,"input_image.png")
                 writer.add_images("input_image",input_images.permute(0,3,1,2),itrs)
+
+                scene_tree_ims = torch.cat(scene_tree_ims, dim = 0)
+             
+                writer.add_images("scene_tree", scene_tree_ims[:,:,:,:3].permute(0,3,1,2), itrs)
+        
 
             itrs += 1
 
