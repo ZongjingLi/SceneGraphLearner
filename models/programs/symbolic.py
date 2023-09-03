@@ -103,6 +103,7 @@ class Scene(SymbolicProgram):
         super().__init__(*args)
 
     def __call__(self,executor):
+        EPS = 1e-6
         device = "cuda:0" if torch.cuda.is_available() else "cpu"
         features = executor.kwargs["features"]
         #logit = torch.ones(features.shape[0] ,device = features.device) * self.BIG_NUMBER
@@ -113,6 +114,7 @@ class Scene(SymbolicProgram):
         logits = []
         for i,score in enumerate(scores):
             #print(i+1,len(score),effective_level)
+            score = score.clamp(EPS, 1 - EPS)
             if (i+1<=effective_level):logits.append(torch.log(score / (1 - score)))
             else:logits.append(torch.log(EPS * torch.ones_like(score).to(device)/(1 - EPS * torch.ones_like(score))))
         return {"end":logits}

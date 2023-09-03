@@ -31,6 +31,7 @@ class SceneProgramExecutor(nn.Module):
 
     def __init__(self, config):
         super().__init__()
+        BIG_NUMBER = 100
         self.config = config
 
         self.entailment = build_entailment(config)
@@ -55,6 +56,7 @@ class SceneProgramExecutor(nn.Module):
         self.hierarchy = 0
 
         self.translator = config.translator
+        self.effective_level = BIG_NUMBER
 
     def get_concept_embedding(self,concept):
         try:

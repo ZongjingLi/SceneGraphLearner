@@ -18,14 +18,17 @@ parser.add_argument("--dataset_root",       default = "/Users/melkor/Documents/d
 parser.add_argument("--device",             default = device)
 parser.add_argument("--name",               default = "SceneGraphLearner")
 
-#parser.add_argument("--domain",             default = "ptr")
-#parser.add_argument("--category",           default = "")
+parser.add_argument("--domain",             default = "toy")
+parser.add_argument("--category",           default = "")
 
-parser.add_argument("--domain",             default = "structure")
-parser.add_argument("--category",           default = ["vase"])
+#parser.add_argument("--domain",             default = "structure")
+#parser.add_argument("--category",           default = ["vase"])
 
 # setup the perception module
 parser.add_argument("--perception",         default = "valkyr")
+parser.add_argument("--channel",            default = 3)
+parser.add_argument("--spatial_dim",        default = 2)
+parser.add_argument("--fourier_dim",        default = 7)
 parser.add_argument("--perception_size",    default = 7)
 parser.add_argument("--imsize",             default = 128)
 parser.add_argument("--resolution",         default = (128,128))
