@@ -1,6 +1,6 @@
-
 import torch
 import torch.nn as nn
+import numpy as np
 
 def get_rays(H, W, K, c2w, inverse_y, flip_x, flip_y, mode = "center"):
     device = "cuda:0" if torch.cuda.is_available() else "cpu"
@@ -9,6 +9,7 @@ def get_rays(H, W, K, c2w, inverse_y, flip_x, flip_y, mode = "center"):
         torch.linspace(0,H-1, H, device = device))
     i = i.t().float()
     j = j.t().float()
+
     if mode == "lefttop":
         pass
     elif mode == "center":
@@ -30,8 +31,11 @@ def get_rays(H, W, K, c2w, inverse_y, flip_x, flip_y, mode = "center"):
             -(j - K[1][2])/K[1][1],
             -torch.ones_like(i)
         ], dim = -1)
+    print("dirs", dirs.shape)
     # Rotate ray direction from camera frame to the world frame
-    rays_d = torch.sum()
+    rays_d = torch.sum(dirs[..., np.newaxis, :] * c2w[:3,:3], dim = -1)
+    print("rays_d",rays_d.shape)
     # Translate the camerta's frame to the world frame.
-    rays_o = c2w[:3,3]
+    rays_o = c2w[:3,3].expand(rays_d.shape)
+    print("rays_o",rays_o.shape)
     return rays_o, rays_d
