@@ -52,7 +52,7 @@ print(evaluate_run(sphere1))
 W, H = (640,640)
 random_image = (torch.randn(W,H,3) ** 2).clamp(0.0,1.0)
 
-
+1
 main_gui = ti.GUI("Main GUI", (W,H) )
 i = 0.0
 while main_gui.running:

@@ -415,7 +415,7 @@ def assignment_entropy(s_matrix):
     EPS = 1e-6
     output_entropy = 0
     for i in range(s_matrix.shape[-1]):
-        input_tensor = s_matrix[:i,:].clamp(EPS, 1-EPS)
+        input_tensor = s_matrix[i:i+1,:].clamp(EPS, 1-EPS)
         lsm = nn.LogSoftmax(dim = -1)
         log_probs = lsm(input_tensor)
         probs = torch.exp(log_probs)
