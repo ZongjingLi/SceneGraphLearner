@@ -228,13 +228,14 @@ def train_scenelearner(train_model, config, args):
                 scene_tree = perception_outputs["scene_tree"]
 
                 scene_tree_ims = []
-                for b in range(min(args.visualize_batch, actual_batch_size)):
+                for b in range(min(2, actual_batch_size)):
                     vis_scores = [score[b].detach() for score in scene_tree["object_scores"][1:]]
                     vis_connections = [connect[b] for connect in scene_tree["connections"][1:]]
                     visualize_tree(vis_scores, vis_connections, scale = 1.618, file_name = "outputs/scene_tree{}.png".format(b))
 
                     for i,recon in enumerate(perception_outputs["reconstructions"]):
                         curr_recon = recon[b,...].cpu().detach()
+
                         save_name = "batch{}_recon_layer{}.png".format(b, i + 1)
                         visualize_image_grid(curr_recon.permute(0,3,1,2), curr_recon.shape[0], save_name)
                         writer.add_images("batch{}_layer{}".format(b, i + 1),curr_recon.permute(0,3,1,2),itrs)

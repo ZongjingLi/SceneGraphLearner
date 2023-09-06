@@ -211,10 +211,11 @@ class GNNSoftPooling(nn.Module):
             output_node_features = []
             output_new_adj = []
             output_s_matrix = []
+            scale = 50
             for i in range(len(adj)):
                 s_matrix = self.assignment_net(x[i:i+1], adj[i]) #[B,N,M]
                 
-                s_matrix = torch.softmax(s_matrix , dim = 2)#.clamp(0.0+eps,1.0-eps)
+                s_matrix = torch.softmax(s_matrix * scale , dim = 2)#.clamp(0.0+eps,1.0-eps)
             
                 node_features = self.feature_net(x[i:i+1],adj[i]) #[B,N,D]
                 node_features = torch.einsum("bnm,bnd->bmd",s_matrix,node_features) #[B,M,D]
@@ -227,6 +228,7 @@ class GNNSoftPooling(nn.Module):
                     torch.spmm(
                         s_matrix[0].permute(1,0),adj[i]
                         ),s_matrix[0])
+                new_adj = new_adj / new_adj.max()
                 #print("new_adj",new_adj[i].max(), new_adj[i].min())
 
                 output_node_features.append(node_features)
@@ -348,6 +350,8 @@ class ValkyrNet(nn.Module):
             if len(prev_mask.shape) == 2:
                 layer_mask = assignment_matrix #[BxNxWxHx1]
             else:layer_mask = torch.bmm(prev_mask,assignment_matrix)
+
+
             layer_masks.append(layer_mask)
             #print(layer_mask.shape)
             exist_prob = torch.max(assignment_matrix,dim = 1).values
@@ -405,6 +409,7 @@ class ValkyrNet(nn.Module):
             
             layer_recon_loss = torch.nn.functional.mse_loss(recons, x.unsqueeze(1).repeat(1,N,1,1,1))
             reconstruction_loss += layer_recon_loss
+            outputs["reconstructions"].append(recons)
 
 
         # [Output the Scene Tree]
