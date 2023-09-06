@@ -150,6 +150,7 @@ def train_scenelearner(train_model, config, args):
                     if loss_name in args.loss_weights:loss_weight = args.loss_weights[loss_name]
                     else:loss_weight = 1.0
                 else:  loss_weight = args.loss_weights[loss_name]
+                writer.add_scalar(loss_name,loss_item, itrs)
                 perception_loss += loss_item * loss_weight
 
             # [Calculate the Language Loss]

@@ -350,6 +350,9 @@ class ValkyrNet(nn.Module):
             layer_masks.append(layer_mask)
             #print(layer_mask.shape)
             exist_prob = torch.max(assignment_matrix,dim = 1).values
+            # [Equivariance Loss]
+            equis =assignment_matrix.unsqueeze(1).unsqueeze(-1)
+            equi_loss += equillibrium_loss(equis)
             
             cluster_assignments.append(assignment_matrix)
             convs_features.append(curr_x)
@@ -407,26 +410,34 @@ class ValkyrNet(nn.Module):
         outputs["scene_tree"] = scene_tree
 
         # [Add all the loss terms]
-        outputs["losses"] = {"entropy":entropy_regular,"reconstruction":reconstruction_loss}
+        outputs["losses"] = {"entropy":entropy_regular,"reconstruction":reconstruction_loss,"equi":equi_loss}
         return outputs
 
 def assignment_entropy(s_matrix):
     # s_matrix: B,N,M
     EPS = 1e-6
     output_entropy = 0
-    for i in range(s_matrix.shape[-1]):
-        input_tensor = s_matrix[i:i+1,:].clamp(EPS, 1-EPS)
-        lsm = nn.LogSoftmax(dim = -1)
-        log_probs = lsm(input_tensor)
-        probs = torch.exp(log_probs)
-        p_log_p = log_probs * probs
-        entropy = -p_log_p.mean()
-        output_entropy += entropy
-    output_entropy = 0.0
-    return output_entropy
+    for b in range(s_matrix.shape[0]):
+        for i in range(s_matrix.shape[1]):
+            input_tensor = s_matrix[b][i:i+1,:].clamp(EPS, 1-EPS)
 
+            lsm = nn.LogSoftmax(dim = -1)
+            log_probs = lsm(input_tensor)
+            probs = torch.exp(log_probs)
+            p_log_p = log_probs * probs
+            entropy = -p_log_p.mean()
+            #print(entropy)
+            output_entropy += entropy
+
+    return output_entropy
+    
 def localization_loss(adj, s_matrix):
     pass
+
+def equillibrium_loss(att):
+    pai = att.sum(dim=3, keepdim=True) # B1K11
+    loss_att_amount = torch.var(pai.reshape(pai.shape[0], -1), dim=1).mean()
+    return loss_att_amount
 
 def build_perception(size,length,device):
     edges = [[],[]]
