@@ -162,9 +162,10 @@ class GraphConvolution(nn.Module):
         self.batch_normal = batch_normal
 
         # params
-        self.weight = nn.Linear( input_feature_num, self.output_feature_num)
-        self.bias = nn.Parameter(torch.zeros(self.output_feature_num,dtype=dtype))
-        self.transform = nn.Linear(self.output_feature_num, self.output_feature_num)
+        latent_dim = 128
+        self.weight = nn.Linear( input_feature_num, latent_dim)
+        self.bias = nn.Parameter(torch.randn(latent_dim,dtype=dtype))
+        self.transform = nn.Linear(latent_dim, self.output_feature_num)
         
         self.sparse = True
         #self.batch_norm = nn.BatchNorm1d(num_features = input_feature_num)
@@ -189,9 +190,9 @@ class GraphConvolution(nn.Module):
         else:
             x = torch.matmul(adj,x[0])
         #if self.add_bias:
-        #x = x + self.bias.unsqueeze(0).unsqueeze(0).repeat(B,N,1)
+        x = x + self.bias.unsqueeze(0).unsqueeze(0).repeat(B,N,1)
 
-        #x = self.transform(x)
+        x = self.transform(x)
 
         #x = torch.nn.functional.normalize(x,p = 1.0, dim = -1, eps = 1e-5)
 
