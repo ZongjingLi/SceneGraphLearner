@@ -93,7 +93,7 @@ def visualize_tree(scores, connections, scale = 1.2, file_name = "temp.png", c =
         if num_nodes == 1: x_positions = [0.0]
         x_locs.append(x_positions); y_locs.append(y_positions)
         
-        plt.scatter(x_positions, y_positions, alpha = score, color = c, linewidths=2.0)
+        plt.scatter(x_positions, y_positions, alpha = score.cpu().detach(), color = c, linewidths=2.0)
     for k,connection in enumerate(reversed(connections)):
         connection = connection
         

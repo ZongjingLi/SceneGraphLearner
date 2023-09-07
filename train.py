@@ -75,14 +75,18 @@ def build_scene_tree(perception_outputs):
 
 def collect_qa_batch(batch_qa):
     batch_wise_qa = []
+    
     for b in range(len(batch_qa[0]["program"])):
         questions_in_batch = {"question":[],"program":[],"answer":[]}
         for qpair in batch_qa:
-            questions_in_batch["question"].append(qpair["question"][b])
+
+            try:questions_in_batch["question"].append(qpair["question"][b])
+            except: questions_in_batch["question"].append("not generated yet.")
             questions_in_batch["program"].append(qpair["program"][b])
             questions_in_batch["answer"].append(qpair["answer"][b])
         batch_wise_qa.append(questions_in_batch)
     return batch_wise_qa
+
 
 def train_scenelearner(train_model, config, args):
     IGNORE_KEY = True

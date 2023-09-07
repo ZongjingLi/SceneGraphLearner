@@ -4,6 +4,13 @@ from .loss import *
 from .acne import *
 from .decoder import *
 
+
+def equillibrium_loss(att):
+    pai = att.sum(dim=3, keepdim=True) # B1K11
+    loss_att_amount = torch.var(pai.reshape(pai.shape[0], -1), dim=1).mean()
+    return loss_att_amount
+
+
 def evaluate_pose(x, att):
     # x: B3N, att: B1KN1
     # ts: B3k1
@@ -12,13 +19,6 @@ def evaluate_pose(x, att):
     ts = torch.sum(
         att * x[:, :, None, :, None], dim=3) # B3K1
     return ts
-
-def equillibrium_loss(att):
-    pai = att.sum(dim=3, keepdim=True) # B1K11
-    loss_att_amount = torch.var(pai.reshape(pai.shape[0], -1), dim=1).mean()
-    return loss_att_amount
-
-
 def spatial_variance(x, att, norm_type="l2"):
     pai = att.sum(dim=3, keepdim=True) # B1K11
     att = att / torch.clamp(pai, min=1e-3)

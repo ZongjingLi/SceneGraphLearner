@@ -163,9 +163,9 @@ class GraphConvolution(nn.Module):
 
         # params
         latent_dim = 128
-        self.weight = nn.Linear( input_feature_num, latent_dim)
+        self.weight = FCBlock(128,2,input_feature_num, latent_dim)
         self.bias = nn.Parameter(torch.randn(latent_dim,dtype=dtype))
-        self.transform = nn.Linear(latent_dim, self.output_feature_num)
+        self.transform = FCBlock(128,2,latent_dim, self.output_feature_num)
         
         self.sparse = True
         #self.batch_norm = nn.BatchNorm1d(num_features = input_feature_num)
@@ -221,7 +221,7 @@ class GNNSoftPooling(nn.Module):
                 node_features = torch.einsum("bnm,bnd->bmd",s_matrix,node_features) #[B,M,D]
                 # [Calculate New Cluster Adjacency]
 
-                adj[i] = torch.Tensor.to_dense(adj[i])
+                adj[i] = adj[i]
                 #print("smt,adj",s_matrix.max(),s_matrix.min(), adj[i].max(), adj[i].min())
                 #print(adj[i].shape, s_matrix.shape)
                 new_adj = torch.spmm(
@@ -285,8 +285,8 @@ class ValkyrNet(nn.Module):
         self.perception_size = config.perception_size
         # build the connection graph for the grid domain
         self.spatial_coords = grid(self.imsize,self.imsize,device=device)
-        self.spatial_fourier_features = get_fourier_feature(self.spatial_coords, term = config.fourier_dim)
-        self.spatial_edges =  build_perception(self.imsize,self.perception_size,device = device)
+        self.spatial_fourier_features = get_fourier_feature(self.spatial_coords, term = config.fourier_dim).to(device)
+        self.spatial_edges =  build_perception(self.imsize,self.perception_size,device = device).to_dense().to(device)
         # [Grid Convs]
         conv_feature_dim = config.conv_feature_dim
         self.grid_convs = RDN(SimpleNamespace(G0=conv_feature_dim  ,RDNkSize=3,n_colors=3,RDNconfig=(4,3,16),scale=[2],no_upsampling=True))
@@ -307,17 +307,19 @@ class ValkyrNet(nn.Module):
     def forward(self, x, verbose = 0):
         outputs = {}
         B,W,H,C = x.shape # input shape
+        device = self.device
 
         # [Grid Convolution] produce initial feature in the grid domain 
-        grid_conv_feature = self.grid_convs(x.permute(0,3,1,2))
+        grid_conv_feature = self.grid_convs(x.permute(0,3,1,2)).to(device).permute(0,2,3,1)
+
         _,_,_,D = grid_conv_feature.shape
         coords_added_conv_feature = torch.cat(
-            [grid_conv_feature, self.spatial_coords.unsqueeze(0).repeat(B,1,1,1)], dim = 3
+            [grid_conv_feature, self.spatial_coords.unsqueeze(0).repeat(B,1,1,1).to(device)], dim = 3
         )
         if verbose:print("coords_added_conv_feature:{}x{}x{}x{}".format(*list(coords_added_conv_feature.shape) ))
 
         coords_added_conv_feature = coords_added_conv_feature.reshape(B,W*H,(D+2))
-        coords_added_conv_feature = F.normalize(coords_added_conv_feature, dim = -1)
+        coords_added_conv_feature = F.normalize(coords_added_conv_feature, dim = 2, p=1.0)
        
         # [DiffPool] each layer performs differentiable [Pn invariant] pooling 
 
@@ -336,13 +338,15 @@ class ValkyrNet(nn.Module):
             "object_scores":[torch.ones(B,curr_x.shape[1]).to(self.device)],
             "connections":[],
             "edges":[self.spatial_edges]}
+        outputs["masks"] = []
 
         layer_reconstructions = []
         layer_masks = [torch.ones(B,curr_x.shape[1]).to(self.device)]  # maintain a mask
         for i,graph_pool in enumerate(self.diff_pool):
             curr_x, curr_edges, assignment_matrix = graph_pool(curr_x, curr_edges)
             B,N,M = assignment_matrix.shape
-            assignment_matrix = torch.min(scene_tree["object_scores"][-1].unsqueeze(2).repeat(1,1,M), assignment_matrix)
+            assignment_matrix = scene_tree["object_scores"][-1].unsqueeze(2).repeat(1,1,M) * assignment_matrix
+            #assignment_matrix = F.normalize(assignment_matrix, dim = 2)
 
             # previous level mask calculation
             prev_mask = layer_masks[-1]
@@ -355,15 +359,18 @@ class ValkyrNet(nn.Module):
             layer_masks.append(layer_mask)
             #print(layer_mask.shape)
             exist_prob = torch.max(assignment_matrix,dim = 1).values
+            #exist_prob = torch.ones(B, assignment_matrix.shape[-1]).to(device)
+
             # [Equivariance Loss]
-            equis =assignment_matrix.unsqueeze(1).unsqueeze(-1)
+            equis = assignment_matrix.unsqueeze(1).unsqueeze(-1)
             equi_loss += equillibrium_loss(equis)
             
             cluster_assignments.append(assignment_matrix)
             convs_features.append(curr_x)
 
             # [Scene Reconstruction]
-            syn_grid = torch.cat([self.spatial_coords ,self.spatial_fourier_features], dim = -1).unsqueeze(0).repeat(B,1,1,1)
+            syn_grid = torch.cat([self.spatial_coords.to(device)\
+                                  ,self.spatial_fourier_features.to(device)], dim = -1).unsqueeze(0).repeat(B,1,1,1)
 
             layer_recons = self.render_fields[i](
                 curr_x,
@@ -378,9 +385,12 @@ class ValkyrNet(nn.Module):
             # [Regular Entropy Term]
             
             attention_mask = layer_mask
+            outputs["masks"].append(attention_mask)
+            
             points = self.spatial_coords.unsqueeze(0).repeat(B,1,1,1).reshape(B,W*H,2)
+            #print(attention_mask.shape, points.shape)
             #pose_locals = evaluate_pose(points , attention_mask)
-            #loc_loss += spatial_variance(points, attention_mask, norm_type="l2")
+            loc_loss += spatial_variance(points, attention_mask.permute(0,2,1), norm_type="l2")
             #equi_loss += equillibrium_loss(attention_mask)
 
             entropy_regular += assignment_entropy(assignment_matrix)
@@ -394,6 +404,7 @@ class ValkyrNet(nn.Module):
 
         # [Calculate Reconstruction at Each Layer]
         outputs["reconstructions"] = []
+
         reconstruction_loss = 0.0
 
         for i,recons in enumerate(layer_reconstructions):
@@ -404,10 +415,12 @@ class ValkyrNet(nn.Module):
                 .unsqueeze(-1).unsqueeze(-1).unsqueeze(-1).repeat(1,1,W,H,C) 
 
             mask = layer_masks[i+1].permute(0,2,1).reshape(B,N,W,H,1)
+            mask = 1
 
             recons = recons * mask * exist_prob
             
-            layer_recon_loss = torch.nn.functional.mse_loss(recons, x.unsqueeze(1).repeat(1,N,1,1,1))
+            #layer_recon_loss = torch.nn.functional.mse_loss(recons, x.unsqueeze(1).repeat(1,N,1,1,1))
+            layer_recon_loss = torch.nn.functional.mse_loss(recons.sum(dim = 1), x)
             reconstruction_loss += layer_recon_loss
             outputs["reconstructions"].append(recons)
 
@@ -416,8 +429,45 @@ class ValkyrNet(nn.Module):
         outputs["scene_tree"] = scene_tree
 
         # [Add all the loss terms]
-        outputs["losses"] = {"entropy":entropy_regular,"reconstruction":reconstruction_loss,"equi":equi_loss}
+        outputs["losses"] = {"entropy":entropy_regular,"reconstruction":reconstruction_loss,"equi":equi_loss,"localization":loc_loss}
         return outputs
+
+def evaluate_pose(x, att):
+    # x: BN3, att: BKN
+    # ts: B3k1
+    att = att.unsqueeze(1).unsqueeze(-1)
+    x = x.permute(0,2,1)
+    pai = att.sum(dim=3, keepdim=True) # B1K11
+    att = att / torch.clamp(pai, min=1e-3)
+    ts = torch.sum(
+        att * x[:, :, None, :, None], dim=3) # B3K1
+    return ts.permute(0,2,1,3).squeeze(-1)
+
+def spatial_variance(x, att, norm_type="l2"):
+    # att: BKN x: BN3
+    x = x.permute(0,2,1)
+    att = att.unsqueeze(1).unsqueeze(-1)
+    pai = att.sum(dim=3, keepdim=True) # B1K11
+    att = att / torch.clamp(pai, min=1e-3)
+    ts = torch.sum(
+        att * x[:, :, None, :, None], dim=3) # B3K1
+
+    x_centered = x[:, :, None] - ts # B3KN
+    x_centered = x_centered.permute(0, 2, 3, 1) # BKN3
+    att = att.squeeze(1) # BKN1
+    cov = torch.matmul(
+        x_centered.transpose(3, 2), att * x_centered) # BK33
+    
+    # l2 norm
+    vol = torch.diagonal(cov, dim1=-2, dim2=-1).sum(2) # BK
+    if norm_type == "l2":
+        vol = vol.norm(dim=1).mean()
+    elif norm_type == "l1":
+        vol = vol.sum(dim=1).mean()
+    else:
+        # vol, _ = torch.diagonal(cov, dim1=-2, dim2=-1).sum(2).max(dim=1)
+        raise NotImplementedError
+    return vol
 
 def assignment_entropy(s_matrix):
     # s_matrix: B,N,M
@@ -434,11 +484,9 @@ def assignment_entropy(s_matrix):
             entropy = -p_log_p.mean()
             #print(entropy)
             output_entropy += entropy
-
+    #output_entropy *= 0
     return output_entropy
     
-def localization_loss(adj, s_matrix):
-    pass
 
 def equillibrium_loss(att):
     pai = att.sum(dim=3, keepdim=True) # B1K11
@@ -458,6 +506,8 @@ def build_perception(size,length,device):
                         if (i+dx) * size + (j + dy) != loc:
                             edges[0].append(loc)
                             edges[1].append( (i+dx) * size + (j + dy))
+                            edges[0].append( (i+dx) * size + (j + dy))
+                            edges[1].append(loc)
     outputs = torch.sparse_coo_tensor(edges, torch.ones(len(edges[0])), size = (size**2, size**2))
     return outputs.to(device)
 
@@ -466,3 +516,4 @@ def grid(width, height, device = "cuda:0" if torch.cuda.is_available() else "cpu
     y = torch.linspace(0,1,height)
     grid_x, grid_y = torch.meshgrid(x, y, indexing='ij')
     return torch.cat([grid_x.unsqueeze(0),grid_y.unsqueeze(0)], dim = 0).permute(1,2,0)
+    
