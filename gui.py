@@ -560,8 +560,10 @@ all_masks = calculate_masks(vis_score,scene_tree["connections"])
 def display_batch(sample,outputs,batch = 0,file_name = "temp.png"):
     
     B, W, H, C = sample["image"].shape
+    count = 0
     for i, masks in enumerate(reversed(outputs["masks"])):
         B, N, K = masks.shape
+        count += 1
         plt.figure("display_{}".format(i), figsize=(K * 4, 2))
         
         plt.subplot(1, K + 1, 1)
@@ -585,7 +587,7 @@ def display_batch(sample,outputs,batch = 0,file_name = "temp.png"):
             plt.axis("off")
             plt.imshow(masks.detach()[batch][:,j].reshape(W,H).permute(1,0), cmap="bone")
             plt.scatter(poses[j,0] * W, poses[j,1] * H, c = "cyan")
-        plt.savefig("outputs/display_{}.png".format(i))
+        plt.savefig("outputs/display_{}.png".format(count))
    
 
 display_batch(sample,perception_outputs)
