@@ -228,7 +228,7 @@ class GNNSoftPooling(nn.Module):
                     torch.spmm(
                         s_matrix[0].permute(1,0),adj[i]
                         ),s_matrix[0])
-                new_adj = new_adj / new_adj.max()
+                #new_adj = new_adj / new_adj.max()
                 #print("new_adj",new_adj[i].max(), new_adj[i].min())
 
                 output_node_features.append(node_features)
@@ -339,6 +339,7 @@ class ValkyrNet(nn.Module):
             "connections":[],
             "edges":[self.spatial_edges]}
         outputs["masks"] = []
+        outputs["poses"] = []
 
         layer_reconstructions = []
         layer_masks = [torch.ones(B,curr_x.shape[1]).to(self.device)]  # maintain a mask
@@ -350,19 +351,18 @@ class ValkyrNet(nn.Module):
 
             # previous level mask calculation
             prev_mask = layer_masks[-1]
-            #print(prev_mask.shape, assignment_matrix.shape)
             if len(prev_mask.shape) == 2:
                 layer_mask = assignment_matrix #[BxNxWxHx1]
             else:layer_mask = torch.bmm(prev_mask,assignment_matrix)
 
 
             layer_masks.append(layer_mask)
-            #print(layer_mask.shape)
+                        
             exist_prob = torch.max(assignment_matrix,dim = 1).values
             #exist_prob = torch.ones(B, assignment_matrix.shape[-1]).to(device)
 
             # [Equivariance Loss]
-            equis = assignment_matrix.unsqueeze(1).unsqueeze(-1)
+            equis =assignment_matrix.unsqueeze(1).unsqueeze(-1)
             equi_loss += equillibrium_loss(equis)
             
             cluster_assignments.append(assignment_matrix)
@@ -384,14 +384,19 @@ class ValkyrNet(nn.Module):
             
             # [Regular Entropy Term]
             
-            attention_mask = layer_mask
-            outputs["masks"].append(attention_mask)
+            layer_mask
+            outputs["masks"].append(layer_mask)
             
             points = self.spatial_coords.unsqueeze(0).repeat(B,1,1,1).reshape(B,W*H,2)
-            #print(attention_mask.shape, points.shape)
-            #pose_locals = evaluate_pose(points , attention_mask)
-            loc_loss += spatial_variance(points, attention_mask.permute(0,2,1), norm_type="l2")
-            #equi_loss += equillibrium_loss(attention_mask)
+
+            variance = spatial_variance(points, layer_mask.permute(0,2,1), norm_type="l2")
+            loc_loss += variance.mean()
+
+            # [Poses]
+            # [B,N,K] [B,N,2]
+            poses = torch.matmul(layer_mask.permute(0,2,1),points)/layer_mask.sum(1).unsqueeze(-1)
+   
+            outputs["poses"].append({"centers":poses,"vars":variance})
 
             entropy_regular += assignment_entropy(assignment_matrix)
 
@@ -415,9 +420,8 @@ class ValkyrNet(nn.Module):
                 .unsqueeze(-1).unsqueeze(-1).unsqueeze(-1).repeat(1,1,W,H,C) 
 
             mask = layer_masks[i+1].permute(0,2,1).reshape(B,N,W,H,1)
-            mask = 1
 
-            recons = recons * mask * exist_prob
+            recons = recons #* mask * exist_prob
             
             #layer_recon_loss = torch.nn.functional.mse_loss(recons, x.unsqueeze(1).repeat(1,N,1,1,1))
             layer_recon_loss = torch.nn.functional.mse_loss(recons.sum(dim = 1), x)
@@ -431,7 +435,6 @@ class ValkyrNet(nn.Module):
         # [Add all the loss terms]
         outputs["losses"] = {"entropy":entropy_regular,"reconstruction":reconstruction_loss,"equi":equi_loss,"localization":loc_loss}
         return outputs
-
 def evaluate_pose(x, att):
     # x: BN3, att: BKN
     # ts: B3k1

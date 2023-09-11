@@ -28,7 +28,7 @@ class ToyData(Dataset):
         self.img_transform = transforms.Compose(
             [transforms.ToTensor()]
         )
-    def __len__(self): return 400#len(self.files)
+    def __len__(self): return 10 #return 400#len(self.files)
 
     def __getitem__(self,index):
         image = Image.open(os.path.join(self.root_dir,"{}.png".format(index)))
