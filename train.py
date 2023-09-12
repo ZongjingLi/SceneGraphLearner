@@ -728,3 +728,26 @@ def train_physics(train_model, config , args):
 
     print("\n\nExperiment {}: Physics Training Completed.".format(args.name))
 
+
+def train_rl(model, config, args):
+    # [Optimizer Setup]
+    if args.optimizer == "Adam":
+        optimizer = torch.optim.Adam(model.parameters(), lr = args.lr)
+    for epoch in range(args.epoch):
+        # [sample trajectories if necessary]
+        trajectory_samples = []
+        for _ in range(args.traj_sample_num):
+            sample_traj = sample_trajectory(model, 0)
+            trajectory_samples.append(sample_traj)
+        # [optimizer model parameters]
+        planning_loss = 0.0
+        for sample in []:
+            planning_loss += 1.0
+        optimizer.zero_grad()
+        planning_loss.backward()
+        optimizer.step()
+    return model
+
+def sample_trajectory(model, env):
+    outputs = {}
+    return outputs
