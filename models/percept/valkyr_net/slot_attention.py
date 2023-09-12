@@ -71,6 +71,7 @@ class SlotAttention(nn.Module):
         v = self.to_v(feat)
 
         attn = None
+        scale = 32.
         for _ in range(self.iters):
             slot_prev_bg = slot_bg
             slot_prev_fg = slot_fg
@@ -79,7 +80,7 @@ class SlotAttention(nn.Module):
 
             dots_fg = torch.einsum('bid,bjd->bij', q_fg, k) * self.scale
             dots_bg = torch.einsum('bid,bjd->bij', q_bg, k) * self.scale
-            dots = torch.cat([dots_bg, dots_fg], dim=1)  # BxKxN
+            dots = torch.cat([dots_bg, dots_fg], dim=1) * scale  # BxKxN
             attn = dots.softmax(dim=1) + self.eps  # BxKxN
             attn_bg, attn_fg = attn[:, 0:1, :], attn[:, 1:, :]  # Bx1xN, Bx(K-1)xN
             attn_weights_bg = attn_bg / attn_bg.sum(dim=1, keepdim=True)  # Bx1xN

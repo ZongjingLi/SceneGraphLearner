@@ -239,7 +239,7 @@ class GNNSoftPooling(nn.Module):
 class SlotSoftPooing(nn.Module):
     def __init__(self, input_feat_dim, output_node_num = 10):
         super().__init__()
-        self.slot_attention = SlotAttention(output_node_num, input_feat_dim , input_feat_dim, 3)
+        self.slot_attention = SlotAttention(output_node_num, input_feat_dim , input_feat_dim, 7)
 
     def forward(self, x , adj = None):
         # X: [B,N,D] adj: None
