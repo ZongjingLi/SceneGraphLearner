@@ -453,7 +453,7 @@ class ValkyrNet(nn.Module):
         outputs["scene_tree"] = scene_tree
 
         # [Add all the loss terms]
-        outputs["losses"] = {"entropy":entropy_regular,"reconstruction":reconstruction_loss,"equi":equi_loss,"localization":loc_loss}
+        outputs["losses"] = {"entropy":entropy_regular*0,"reconstruction":reconstruction_loss*1,"equi":equi_loss*0,"localization":loc_loss*0}
         return outputs
 
 def evaluate_pose(x, att):
