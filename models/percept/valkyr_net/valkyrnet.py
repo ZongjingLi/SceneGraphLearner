@@ -298,7 +298,7 @@ class ValkyrNet(nn.Module):
         self.imsize = config.imsize
         self.perception_size = config.perception_size
         # build the connection graph for the grid domain
-        self.spatial_coords = grid(self.imsize,self.imsize,device=device)
+        self.spatial_coords = grid(self.imsize,self.imsize,device=device).to(device)
         self.spatial_fourier_features = get_fourier_feature(self.spatial_coords, term = config.fourier_dim).to(device)
         self.spatial_edges =  build_perception(self.imsize,self.perception_size,device = device).to_dense().to(device)
         # [Grid Convs]
@@ -311,7 +311,7 @@ class ValkyrNet(nn.Module):
         if graph_pool == "GNN":
             self.diff_pool = nn.ModuleList([
                 GNNSoftPooling(input_feat_dim = conv_feature_dim+2,output_node_num = node_num ) for node_num in hierarchy_nodes
-            ])
+            ]) 
         if graph_pool == "Slot":
             self.diff_pool = nn.ModuleList([
                 SlotSoftPooing(input_feat_dim = conv_feature_dim+2,output_node_num = node_num ) for node_num in hierarchy_nodes
