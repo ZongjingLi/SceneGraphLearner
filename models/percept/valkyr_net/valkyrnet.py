@@ -1,9 +1,9 @@
-
 import torch
 import torch.nn as nn
 from types import SimpleNamespace
-
+from .slot_attention import *
 from .utils import *
+from .convs import *
 from models.nn.primary import *
 
 def evaluate_pose(x, att):
@@ -206,7 +206,6 @@ class GNNSoftPooling(nn.Module):
     
     def forward(self, x, adj):
         B,N,D = x.shape
-        # B,N,N = adj.shape
         if isinstance(adj, list):
             output_node_features = []
             output_new_adj = []
@@ -222,14 +221,12 @@ class GNNSoftPooling(nn.Module):
                 # [Calculate New Cluster Adjacency]
 
                 adj[i] = adj[i]
-                #print("smt,adj",s_matrix.max(),s_matrix.min(), adj[i].max(), adj[i].min())
-                #print(adj[i].shape, s_matrix.shape)
+
                 new_adj = torch.spmm(
                     torch.spmm(
                         s_matrix[0].permute(1,0),adj[i]
                         ),s_matrix[0])
                 #new_adj = new_adj / new_adj.max()
-                #print("new_adj",new_adj[i].max(), new_adj[i].min())
 
                 output_node_features.append(node_features)
                 output_new_adj.append(new_adj)
@@ -237,6 +234,23 @@ class GNNSoftPooling(nn.Module):
 
             output_node_features = torch.cat(output_node_features, dim = 0)
             output_s_matrix = torch.cat(output_s_matrix, dim = 0)
+        return output_node_features,output_new_adj,output_s_matrix
+
+class SlotSoftPooing(nn.Module):
+    def __init__(self, input_feat_dim, output_node_num = 10):
+        super().__init__()
+        self.slot_attention = SlotAttention(output_node_num, input_feat_dim , input_feat_dim, 3)
+
+    def forward(self, x , adj = None):
+        # X: [B,N,D] adj: None
+        B = x.shape[0]
+        inputs = x
+        slot_features, att = self.slot_attention(inputs)
+
+        output_node_features = slot_features
+        M = output_node_features.shape[1]
+        output_s_matrix = att.permute(0,2,1)
+        output_new_adj = torch.ones(B,M,M)
         return output_node_features,output_new_adj,output_s_matrix
 
 def get_fourier_feature(grid, term = 7):
@@ -255,7 +269,7 @@ class ObjectRender(nn.Module):
         fourier_dim = config.fourier_dim
 
         self.conv_feature_dim = conv_feature_dim
-        self.render_block  = FCBlock(128,2,conv_feature_dim + spatial_dim + spatial_dim + 2*spatial_dim*fourier_dim,channel_dim)
+        self.render_block  = FCBlock(128,3,conv_feature_dim + spatial_dim + spatial_dim + 2*spatial_dim*fourier_dim,channel_dim)
 
     def forward(self, latent, grid):
         B,N,D = latent.shape
@@ -292,11 +306,16 @@ class ValkyrNet(nn.Module):
         self.grid_convs = RDN(SimpleNamespace(G0=conv_feature_dim  ,RDNkSize=3,n_colors=3,RDNconfig=(4,3,16),scale=[2],no_upsampling=True))
         
         # [Diff Pool Construction]
+        graph_pool = "Slot"
         hierarchy_nodes = config.hierarchy_construct 
-        self.diff_pool = nn.ModuleList([
-            GNNSoftPooling(input_feat_dim = conv_feature_dim+2,output_node_num = node_num ) for node_num in hierarchy_nodes
-        ])
-        
+        if graph_pool == "GNN":
+            self.diff_pool = nn.ModuleList([
+                GNNSoftPooling(input_feat_dim = conv_feature_dim+2,output_node_num = node_num ) for node_num in hierarchy_nodes
+            ])
+        if graph_pool == "Slot":
+            self.diff_pool = nn.ModuleList([
+                SlotSoftPooing(input_feat_dim = conv_feature_dim+2,output_node_num = node_num ) for node_num in hierarchy_nodes
+            ])
 
         # [Render Fields]
         self.render_fields = nn.ModuleList([ObjectRender(config, conv_feature_dim) for _ in hierarchy_nodes])
@@ -344,6 +363,7 @@ class ValkyrNet(nn.Module):
         layer_reconstructions = []
         layer_masks = [torch.ones(B,curr_x.shape[1]).to(self.device)]  # maintain a mask
         for i,graph_pool in enumerate(self.diff_pool):
+            #print(curr_x.shape)
             curr_x, curr_edges, assignment_matrix = graph_pool(curr_x, curr_edges)
             B,N,M = assignment_matrix.shape
             assignment_matrix = scene_tree["object_scores"][-1].unsqueeze(2).repeat(1,1,M) * assignment_matrix
@@ -358,8 +378,8 @@ class ValkyrNet(nn.Module):
 
             layer_masks.append(layer_mask)
                         
-            exist_prob = torch.max(assignment_matrix,dim = 1).values
-            #exist_prob = torch.ones(B, assignment_matrix.shape[-1]).to(device)
+            #exist_prob = torch.max(assignment_matrix,dim = 1).values
+            exist_prob = torch.ones(B, assignment_matrix.shape[-1]).to(device)
 
             # [Equivariance Loss]
             equis =assignment_matrix.unsqueeze(1).unsqueeze(-1)
@@ -398,7 +418,7 @@ class ValkyrNet(nn.Module):
    
             outputs["poses"].append({"centers":poses,"vars":variance})
 
-            entropy_regular += assignment_entropy(assignment_matrix)
+            entropy_regular += 0*assignment_entropy(assignment_matrix)
 
             # load results to the scene tree
             scene_tree["x"].append(curr_x)
@@ -421,7 +441,7 @@ class ValkyrNet(nn.Module):
 
             mask = layer_masks[i+1].permute(0,2,1).reshape(B,N,W,H,1)
 
-            recons = recons #* mask * exist_prob
+            recons = recons * mask * exist_prob
             
             #layer_recon_loss = torch.nn.functional.mse_loss(recons, x.unsqueeze(1).repeat(1,N,1,1,1))
             layer_recon_loss = torch.nn.functional.mse_loss(recons.sum(dim = 1), x)
@@ -435,6 +455,7 @@ class ValkyrNet(nn.Module):
         # [Add all the loss terms]
         outputs["losses"] = {"entropy":entropy_regular,"reconstruction":reconstruction_loss,"equi":equi_loss,"localization":loc_loss}
         return outputs
+
 def evaluate_pose(x, att):
     # x: BN3, att: BKN
     # ts: B3k1
@@ -464,9 +485,9 @@ def spatial_variance(x, att, norm_type="l2"):
     # l2 norm
     vol = torch.diagonal(cov, dim1=-2, dim2=-1).sum(2) # BK
     if norm_type == "l2":
-        vol = vol.norm(dim=1).mean()
+        vol = vol.norm(dim=1)
     elif norm_type == "l1":
-        vol = vol.sum(dim=1).mean()
+        vol = vol.sum(dim=1)
     else:
         # vol, _ = torch.diagonal(cov, dim1=-2, dim2=-1).sum(2).max(dim=1)
         raise NotImplementedError
@@ -487,7 +508,7 @@ def assignment_entropy(s_matrix):
             entropy = -p_log_p.mean()
             #print(entropy)
             output_entropy += entropy
-    #output_entropy *= 0
+    output_entropy *= 0
     return output_entropy
     
 
@@ -519,4 +540,3 @@ def grid(width, height, device = "cuda:0" if torch.cuda.is_available() else "cpu
     y = torch.linspace(0,1,height)
     grid_x, grid_y = torch.meshgrid(x, y, indexing='ij')
     return torch.cat([grid_x.unsqueeze(0),grid_y.unsqueeze(0)], dim = 0).permute(1,2,0)
-    
