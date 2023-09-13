@@ -1,4 +1,3 @@
-from this import d
 import torch.nn as nn
 import torch
 
@@ -23,16 +22,27 @@ def simulate_env(model, env, goal = None, max_steps = 1000, visualize_map = True
         # [Build a Plan]
         if goal is not None:model.plan(goal)
         plt.figure("epoch:{}".format(epoch))
-        while not done or steps:
-            obs = env.get_observation()
-            action = model.get_action(obs)
-            next_state = 0
+        while not done or steps < max_steps:
+            local_obs, global_obs = env.render()
+            action = model.get_action(local_obs)
+            update = env.step(action)
+
+            reward = update["reward"]
+            done = update["done"]
 
             if visualize_map:
-                plt.imshow()
+                plt.subplot(121)
+                plt.cla();plt.axis("off")
+                plt.imshow(local_obs)
+                plt.subplot(122)
+                plt.cla();plt.axis("off")
+                plt.imshow(global_obs)
                 plt.pause(0.01)
+            steps += 1
     return 0
 
 if __name__ == "__main__":
     env = Northrend(config)
-    random_model = RandomModel(4)
+    random_model = RandomModel(6)
+
+    simulate_env(random_model, env,)
