@@ -100,8 +100,8 @@ parser.add_argument("--base_penalty",           default = 1.)
 
 # [Environment Config]
 parser.add_argument("--env_name",               default = "MKGrid")
-parser.add_argument("--global_env_resolution",  default = (64,64))
-parser.add_argument("--local_env_resolution",   default = (32,32))
+parser.add_argument("--env_global_resolution",  default = (64,64))
+parser.add_argument("--env_local_resolution",   default = (32,32))
 
 config = parser.parse_args(args = [])
 
