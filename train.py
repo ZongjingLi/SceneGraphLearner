@@ -1,4 +1,6 @@
 import warnings
+
+from env.mkgrid.northrend_env import *
 warnings.filterwarnings("ignore")
 
 import torch
@@ -730,24 +732,72 @@ def train_physics(train_model, config , args):
 
 
 def train_rl(model, config, args):
+    # [Simulation Environment Setup]
+    print("start the reinforcement interaction training.")
+    if args.env_name == "Northrend":
+        env = Northrend(config, load_map = None)
     # [Optimizer Setup]
     if args.optimizer == "Adam":
         optimizer = torch.optim.Adam(model.parameters(), lr = args.lr)
+    
+    start = time.time()
+    itrs = 0
     for epoch in range(args.epoch):
         # [sample trajectories if necessary]
-        trajectory_samples = []
-        for _ in range(args.traj_sample_num):
-            sample_traj = sample_trajectory(model, 0)
-            trajectory_samples.append(sample_traj)
+        trajectory_samples = sample_trajectory(model, env, \
+                goal = None, num_samples = args.traj_sample_num, visualize_map= False)
         # [optimizer model parameters]
         planning_loss = 0.0
-        for sample in []:
-            planning_loss += 1.0
+        for i,loss in enumerate(trajectory_samples[0]):
+            reward = trajectory_samples[1][i]
+            planning_loss += loss * reward
+
+        # [Working Loss Calculated]
+        working_loss = planning_loss
+        
         optimizer.zero_grad()
         planning_loss.backward()
         optimizer.step()
+
+        itrs += 1
+        sys.stdout.write ("\rEpoch: {}, Itrs: {} Loss: {} Time: {}"\
+                .format(epoch + 1, itrs, working_loss,datetime.timedelta(seconds=time.time() - start)))
+            
     return model
 
-def sample_trajectory(model, env):
-    outputs = {}
-    return outputs
+def  sample_trajectory(model, env, goal = None,num_samples=1, max_steps = 1000, visualize_map = True):
+    losses = []
+    rewards = []
+    for epoch in range(num_samples):
+        done = False
+        steps = 0
+        env.reset()
+
+        # [Build a Plan]
+        if goal is not None:model.plan(goal)
+        plt.figure("epoch:{}".format(epoch))
+        epoch_loss = 0
+        epoch_reward = 0
+        while not done and steps < max_steps:
+            # [Get Current State]
+            local_obs, global_obs = env.render()
+
+            # [Action Bases on Current Plan and State]
+            action,loss = model.get_action(local_obs)
+            update = env.step(action)
+
+            # [Calculate Reward and Epoch Loss]
+            reward = update["reward"]
+            done = update["done"]
+            epoch_reward += reward
+            epoch_loss += loss
+
+            # [Visualize Results]
+            if visualize_map:
+                plt.subplot(121);plt.cla();plt.axis("off");plt.imshow(local_obs)
+                plt.subplot(122);plt.cla();plt.axis("off");plt.imshow(global_obs)
+                plt.pause(0.01)
+            steps += 1
+        losses.append(epoch_loss / steps)
+        rewards.append(epoch_reward / steps)
+    return losses, rewards

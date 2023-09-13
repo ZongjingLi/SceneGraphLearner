@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 from utils import *
 
 class Northrend(nn.Module):
-    def __init__(self, config):
+    def __init__(self, config, load_map = None):
         super().__init__()
         H, W = config.env_global_resolution    
         locH, locW = config.env_local_resolution
@@ -17,7 +17,12 @@ class Northrend(nn.Module):
         base = (locW//2,locH//2)
         self.base = base
         self.grid = torch.tensor(np.zeros([H+locH,W+locW])).int()
-        self.grid[base[0]:base[0]+W,base[1]:base[1]+H] = 1
+        
+        # [Load the Map]
+        if load_map is not None:
+            self.grid[base[0]:base[0]+W,base[1]:base[1]+H] = np.load(load_map)
+        else:
+            self.grid[base[0]:base[0]+W,base[1]:base[1]+H] = 4
         self.W, self.H = self.global_resolution
 
         # [Get Color Map]
@@ -26,13 +31,10 @@ class Northrend(nn.Module):
         self.color_map = load_json(root + "/env/mkgrid/domains/{}_color_map.json".format(name))
         self.int2colors = np.array([self.color_map[c] for c in self.color_map])
 
-        self.agent_x = 0
-        self.agent_y = 0
+        # [Agent Position]
+        self.agent_x = H//2
+        self.agent_y = W//2
         self.agent_dir = torch.tensor([1,0]).int()
-        self.I = torch.tensor([
-            [0,  1],
-            [-1, 0]
-        ]).int()
 
     def reset(self):
         return 

@@ -46,6 +46,9 @@ def load_scene(scene, k):
 weights = {"reconstruction":1.0,"color_reconstruction":1.0,"occ_reconstruction":1.0,"localization":1.0,"chamfer":1.0,"equillibrium_loss":1.0}
 
 argparser = argparse.ArgumentParser()
+
+argparser.add_argument("--mode",                    default = "scenelearner")
+
 # [general config of the training]
 argparser.add_argument("--phase",                   default = "0")
 argparser.add_argument("--device",                  default = config.device)
@@ -83,6 +86,10 @@ argparser.add_argument("--checkpoint_itrs",         default = 10,       type=int
 argparser.add_argument("--pretrain_perception",     default = False)
 argparser.add_argument("--visualize_batch",         default = 2)
 
+# [reinforcnment learning setup]
+argparser.add_argument("--env_name",                default = "None")
+argparser.add_argument("--traj_sample_num",         default = 2)
+
 args = argparser.parse_args()
 
 config.perception = args.perception
@@ -94,13 +101,13 @@ args.batch_size = int(args.batch_size)
 
 if args.checkpoint_dir:
     #model = torch.load(args.checkpoint_dir, map_location = config.device)
-    model = SceneLearner(config)
+    model = AutoLearner(config)
     if "ckpt" in args.checkpoint_dir[-4:]:
-        model = torch.load(args.checkpoint_dir, map_location = args.device)
+        model.scenelearner = torch.load(args.checkpoint_dir, map_location = args.device)
     else: model.load_state_dict(torch.load(args.checkpoint_dir, map_location=args.device))
 else:
     print("No checkpoint to load and creating a new model instance")
-    model = SceneLearner(config)
+    model = AutoLearner(config)
 model = model.to(args.device)
 
 
@@ -110,18 +117,24 @@ if args.pretrain_perception:
 
 print("using perception: {} knowledge:{} dataset:{}".format(args.perception,config.concept_type,args.dataset))
 
+if args.mode == "planning":
+    train_rl(model.planning_model, config, args)
 
-if args.dataset in ["Objects3d","StructureNet"]:
-    print("start the 3d point cloud model training.")
-    train_pointcloud(model, config, args, phase = args.phase)
+if args.mode == "physics":
+    train_physics(model, config, args)
 
-if args.dataset in ["Sprites","Acherus","Toys","PTR"]:
-    print("start the image domain training session.")
+if args.mode == "scenelearner":
+    if args.dataset in ["Objects3d","StructureNet"]:
+        print("start the 3d point cloud model training.")
+        train_pointcloud(model.scenelearner, config, args, phase = args.phase)
 
-    if args.name in ["VKY"]:
-        train_scenelearner(model, config, args)
-    else:
-        train_image(model, config, args)
+    if args.dataset in ["Sprites","Acherus","Toys","PTR"]:
+        print("start the image domain training session.")
+
+        if args.name in ["VKY"]:
+            train_scenelearner(model.scenelearner, config, args)
+        else:
+            train_image(model.scenelearner, config, args)
 
 
 
