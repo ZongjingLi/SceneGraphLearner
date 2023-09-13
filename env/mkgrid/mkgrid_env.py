@@ -29,3 +29,10 @@ class MKGrid(nn.Module):
                   "next_state":next_state,
                   "done":done}
         return outputs
+    
+if __name__ == "__main__":
+    from utils import *
+    color_map_dict = {
+        "1":
+    }
+    save_json(color_map_dict)

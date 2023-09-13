@@ -288,6 +288,12 @@ class ObjectRender(nn.Module):
         cat_feature = torch.cat([grid, expand_latent], dim = -1)
         return self.render_block(cat_feature)
 
+class ConvTransObjectRender(nn.Module):
+    def __init__(self, config, conv_feature_dim):
+        super().__init__()
+    
+    def forward(self, x):
+        return x
 
 class ValkyrNet(nn.Module):
     def __init__(self, config):
