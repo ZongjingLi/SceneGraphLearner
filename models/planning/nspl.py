@@ -13,3 +13,6 @@ class NeuroSymbolicPlanner(nn.Module):
         loss = self.pseudo_param.norm()
         action = np.random.randint(0,6)
         return action, loss
+
+    def plan(self, goal):
+        return 0
