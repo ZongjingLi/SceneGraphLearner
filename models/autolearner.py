@@ -20,3 +20,5 @@ class AutoLearner(nn.Module):
 
     def forward(self, x):
         return x
+
+    def display(self): return
