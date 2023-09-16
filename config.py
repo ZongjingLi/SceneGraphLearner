@@ -28,14 +28,15 @@ parser.add_argument("--category",               default = "")
 parser.add_argument("--perception",             default = "valkyr")
 parser.add_argument("--channel",                default = 3)
 parser.add_argument("--spatial_dim",            default = 2)
-parser.add_argument("--fourier_dim",            default = 7)
-parser.add_argument("--perception_size",        default = 3)
+parser.add_argument("--fourier_dim",            default = 10)
+parser.add_argument("--perception_size",        default = 2)
 parser.add_argument("--imsize",                 default = 128)
 parser.add_argument("--resolution",             default = (128,128))
 parser.add_argument("--conv_feature_dim",       default = 32)
 parser.add_argument("--hidden_dim",             default = 100)
-parser.add_argument("--latent_dim",             default = 128) # point cloud encoder
+parser.add_argument("--latent_dim",             default = 132) # point cloud encoder
 parser.add_argument("--scaling",                default = 10.0)
+parser.add_argument("--itrs",                   default = 7)
 
 # acne network
 parser.add_argument("--num_pts",                default = 1000)
@@ -57,7 +58,7 @@ parser.add_argument("--pose_code",              default = "nl-noR_T")
 parser.add_argument("--object_num",             default = 11)
 parser.add_argument("--part_num",               default = 3)
 parser.add_argument("--hierarchy_latent",       default = 128)
-parser.add_argument("--hierarchy_construct",    default = [5,7])
+parser.add_argument("--hierarchy_construct",    default = [4])
 
 # setup the concept learner 
 parser.add_argument("--concept_projection",     default = True)

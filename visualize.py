@@ -5,7 +5,7 @@ from types import SimpleNamespace
 from config import *
 
 from datasets import *
-B = 2
+B = 1
 shuffle = 1
 #dataset = ToyDataWithQuestions(split = "train", resolution = (128,128))
 dataset = SpriteWithQuestions(resolution = (128,128))
@@ -17,47 +17,6 @@ for sample in dataloader:
 plt.axis("off")
 plt.imshow(sample["image"][0])
 
-config.perception = "valkyr"
-model = SceneLearner(config)
-
-
-def evaluate_pose(x, att):
-    # x: B3N, att: B1KN1
-    # ts: B3k1
-    pai = att.sum(dim=3, keepdim=True) # B1K11
-    att = att / torch.clamp(pai, min=1e-3)
-    ts = torch.sum(
-        att * x[:, :, None, :, None], dim=3) # B3K1
-    return ts
-
-def equillibrium_loss(att):
-    pai = att.sum(dim=3, keepdim=True) # B1K11
-    loss_att_amount = torch.var(pai.reshape(pai.shape[0], -1), dim=1).mean()
-    return loss_att_amount
-
-
-def spatial_variance(x, att, norm_type="l2"):
-    pai = att.sum(dim=3, keepdim=True) # B1K11
-    att = att / torch.clamp(pai, min=1e-3)
-    ts = torch.sum(
-        att * x[:, :, None, :, None], dim=3) # B3K1
-
-    x_centered = x[:, :, None] - ts # B3KN
-    x_centered = x_centered.permute(0, 2, 3, 1) # BKN3
-    att = att.squeeze(1) # BKN1
-    cov = torch.matmul(
-        x_centered.transpose(3, 2), att * x_centered) # BK33
-    
-    # l2 norm
-    vol = torch.diagonal(cov, dim1=-2, dim2=-1).sum(2) # BK
-    if norm_type == "l2":
-        vol = vol.norm(dim=1).mean()
-    elif norm_type == "l1":
-        vol = vol.sum(dim=1).mean()
-    else:
-        # vol, _ = torch.diagonal(cov, dim1=-2, dim2=-1).sum(2).max(dim=1)
-        raise NotImplementedError
-    return vol
 
 class RDB_Conv(nn.Module):
     def __init__(self, inChannels, growRate, kSize=3):
@@ -166,7 +125,7 @@ class RDN(nn.Module):
 
 class GraphConvolution(nn.Module):
 
-    def __init__(self, input_feature_num, output_feature_num, add_bias=True, dtype=torch.float,
+    def __init__(self, input_feature_num, output_feature_num, itrs = 12, add_bias=True, dtype=torch.float,
                  batch_normal=True):
         super().__init__()
         # shapes
@@ -177,12 +136,14 @@ class GraphConvolution(nn.Module):
         self.batch_normal = batch_normal
 
         # params
-        latent_dim = 128
-        self.weight = FCBlock(128,2,input_feature_num, latent_dim)
+        latent_dim = input_feature_num
+        self.prim_net = nn.Identity() #FCBlock(128,2,input_feature_num, latent_dim)
+        self.prop = nn.Linear(latent_dim, latent_dim)
         self.bias = nn.Parameter(torch.randn(latent_dim,dtype=dtype))
-        self.transform = FCBlock(128,2,latent_dim, self.output_feature_num)
+        self.transform = FCBlock(128,3,latent_dim, self.output_feature_num)
         
         self.sparse = True
+        self.itrs = itrs
         #self.batch_norm = nn.BatchNorm1d(num_features = input_feature_num)
             
     def set_trainable(self, train=True):
@@ -197,38 +158,75 @@ class GraphConvolution(nn.Module):
         B, N, D = x.shape
         node_feature = x
 
-        x = self.weight(node_feature)
+        x = self.prim_net(node_feature)
+        x = F.normalize(x, p = 2)
         #x = torch.nn.functional.normalize(x,p = 1.0, dim = -1, eps = 1e-5)
+        for i in range(self.itrs):
+            if self.sparse or isinstance(adj, torch.SparseTensor):
+                x = x + torch.spmm(adj,x[0]).unsqueeze(0)
+            else:
+                #x = x + torch.matmul(adj,x[0])
+                x = x + self.adj_split(x[0], adj)
+            if self.add_bias:
+                x = x + self.bias.unsqueeze(0).unsqueeze(0).repeat(B,N,1)
+            x = F.normalize(x,p = 2)
 
-        if self.sparse or isinstance(adj, torch.SparseTensor):
-            x = torch.spmm(adj,x[0]).unsqueeze(0)
-        else:
-            x = torch.matmul(adj,x[0])
-        #if self.add_bias:
-        x = x + self.bias.unsqueeze(0).unsqueeze(0).repeat(B,N,1)
-
-        x = self.transform(x)
+        x = self.transform(x) 
 
         #x = torch.nn.functional.normalize(x,p = 1.0, dim = -1, eps = 1e-5)
 
         return x
+    
+    @staticmethod
+    def adj_split(x, adj):
+        # x: [N,D] adj:[N,N]
+        if True:
+            weights = torch.tanh(torch.einsum("nd,nd->nn"))
+            weights = weights * adj
+            x = x + torch.mm(weights,x)
+        return x
+    
+class GraphConvolution_(nn.Module):
+    def __init__(self, input_dim, output_dim, itrs = 3):
+        super().__init__()
+        hidden_dim = 128
+        self.prim_encoder = nn.Linear(input_dim, hidden_dim)
+
+        self.edge_propagators = nn.Linear(hidden_dim, hidden_dim)
+
+        self.classifier = nn.Linear(hidden_dim, output_dim)
+        self.itrs = itrs
+
+    def forward(self, x, adj):
+        # x:[B,N,D] adj:[B,N,N]
+        prop_features = self.prim_encoder(x)
+
+        for i in range(self.itrs):
+            if len(adj.shape) == 3:
+                prop_features = torch.bmm(adj, prop_features)
+                prop_features = self.edge_propagators(prop_features)
+            else: 
+                prop_features = torch.mm(adj, prop_features.squeeze(0)).unsqueeze(0)
+                prop_features = self.edge_propagators(prop_features)
+            
+        outputs = self.classifier(prop_features)
+        return outputs
 
 class GNNSoftPooling(nn.Module):
-    def __init__(self, input_feat_dim, output_node_num = 10):
+    def __init__(self, input_feat_dim, output_node_num = 5, itrs = 1):
         super().__init__()
-        self.assignment_net = GraphConvolution(input_feat_dim, output_node_num)
-        self.feature_net =   GraphConvolution(input_feat_dim, input_feat_dim) 
-    
+        self.assignment_net = GraphConvolution(input_feat_dim, output_node_num, itrs)
+        self.feature_net =   GraphConvolution(input_feat_dim, input_feat_dim, itrs) 
+
     def forward(self, x, adj):
         B,N,D = x.shape
         if isinstance(adj, list):
             output_node_features = []
             output_new_adj = []
             output_s_matrix = []
-            scale = 50
+            scale = 12.2
             for i in range(len(adj)):
                 s_matrix = self.assignment_net(x[i:i+1], adj[i]) #[B,N,M]
-                
                 s_matrix = torch.softmax(s_matrix * scale , dim = 2)#.clamp(0.0+eps,1.0-eps)
             
                 node_features = self.feature_net(x[i:i+1],adj[i]) #[B,N,D]
@@ -251,6 +249,23 @@ class GNNSoftPooling(nn.Module):
             output_s_matrix = torch.cat(output_s_matrix, dim = 0)
         return output_node_features,output_new_adj,output_s_matrix
 
+class SlotSoftPooing(nn.Module):
+    def __init__(self, input_feat_dim, output_node_num = 10, itrs = 1):
+        super().__init__()
+        self.slot_attention = SlotAttention(output_node_num, input_feat_dim , input_feat_dim, 7)
+
+    def forward(self, x , adj = None):
+        # X: [B,N,D] adj: None
+        
+        inputs = x
+        slot_features, att = self.slot_attention(inputs)
+
+        output_node_features = slot_features
+        M = output_node_features.shape[1]
+        output_s_matrix = att.permute(0,2,1)
+        output_new_adj = torch.ones(B,M,M)
+        return output_node_features,output_new_adj,output_s_matrix
+
 def get_fourier_feature(grid, term = 7):
     output_feature = []
     for k in range(term):
@@ -267,7 +282,7 @@ class ObjectRender(nn.Module):
         fourier_dim = config.fourier_dim
 
         self.conv_feature_dim = conv_feature_dim
-        self.render_block  = FCBlock(128,2,conv_feature_dim + spatial_dim + spatial_dim + 2*spatial_dim*fourier_dim,channel_dim)
+        self.render_block  = FCBlock(128,3,conv_feature_dim + spatial_dim + spatial_dim + 2*spatial_dim*fourier_dim,channel_dim)
 
     def forward(self, latent, grid):
         B,N,D = latent.shape
@@ -284,7 +299,7 @@ class ObjectRender(nn.Module):
             grid = grid.unsqueeze(1).repeat(1,N,1,1)
             expand_latent = latent.unsqueeze(2).repeat(1,1,WH,1)
         cat_feature = torch.cat([grid, expand_latent], dim = -1)
-        return self.render_block(cat_feature)
+        return (self.render_block(cat_feature) * 0.7 + 0.5).clamp(0.0, 1.0)
 
 
 class ValkyrNet(nn.Module):
@@ -304,11 +319,16 @@ class ValkyrNet(nn.Module):
         self.grid_convs = RDN(SimpleNamespace(G0=conv_feature_dim  ,RDNkSize=3,n_colors=3,RDNconfig=(4,3,16),scale=[2],no_upsampling=True))
         
         # [Diff Pool Construction]
+        graph_pool = "GNN"
         hierarchy_nodes = config.hierarchy_construct 
-        self.diff_pool = nn.ModuleList([
-            GNNSoftPooling(input_feat_dim = conv_feature_dim+2,output_node_num = node_num ) for node_num in hierarchy_nodes
-        ])
-        
+        if graph_pool == "GNN":
+            self.diff_pool = nn.ModuleList([
+                GNNSoftPooling(input_feat_dim = conv_feature_dim+2,output_node_num = node_num ,itrs = config.itrs) for node_num in hierarchy_nodes
+            ])
+        if graph_pool == "Slot":
+            self.diff_pool = nn.ModuleList([
+                SlotSoftPooing(input_feat_dim = conv_feature_dim+2,output_node_num = node_num ) for node_num in hierarchy_nodes
+            ])
 
         # [Render Fields]
         self.render_fields = nn.ModuleList([ObjectRender(config, conv_feature_dim) for _ in hierarchy_nodes])
@@ -359,7 +379,6 @@ class ValkyrNet(nn.Module):
             curr_x, curr_edges, assignment_matrix = graph_pool(curr_x, curr_edges)
             B,N,M = assignment_matrix.shape
             assignment_matrix = scene_tree["object_scores"][-1].unsqueeze(2).repeat(1,1,M) * assignment_matrix
-            #assignment_matrix = F.normalize(assignment_matrix, dim = 2)
 
             # previous level mask calculation
             prev_mask = layer_masks[-1]
@@ -370,12 +389,17 @@ class ValkyrNet(nn.Module):
 
             layer_masks.append(layer_mask)
                         
-            exist_prob = torch.max(assignment_matrix,dim = 1).values
-            #exist_prob = torch.ones(B, assignment_matrix.shape[-1]).to(device)
+            #exist_prob = torch.max(assignment_matrix,dim = 1).values
+            exist_prob = torch.ones(B, assignment_matrix.shape[-1]).to(device)
 
             # [Equivariance Loss]
             equis =assignment_matrix.unsqueeze(1).unsqueeze(-1)
-            equi_loss += equillibrium_loss(equis)
+            equi_loss += equillibrium_loss(equis) 
+            
+            # [Frobenius Term]
+
+            for b in range(len(curr_edges)):
+                equi_loss += 0.0 # frobenius_norm(scene_tree["edges"][-1][b], assignment_matrix[b])
             
             cluster_assignments.append(assignment_matrix)
             convs_features.append(curr_x)
@@ -402,7 +426,7 @@ class ValkyrNet(nn.Module):
             points = self.spatial_coords.unsqueeze(0).repeat(B,1,1,1).reshape(B,W*H,2)
 
             variance = spatial_variance(points, layer_mask.permute(0,2,1), norm_type="l2")
-            loc_loss += variance.mean()
+            loc_loss += 1.0 * variance.mean()
 
             # [Poses]
             # [B,N,K] [B,N,2]
@@ -445,8 +469,14 @@ class ValkyrNet(nn.Module):
         outputs["scene_tree"] = scene_tree
 
         # [Add all the loss terms]
+        #outputs["masks"] = layer_masks
         outputs["losses"] = {"entropy":entropy_regular,"reconstruction":reconstruction_loss,"equi":equi_loss,"localization":loc_loss}
         return outputs
+
+def frobenius_norm(A, S):
+    # A: [N,N] S:[N,M]
+    coarse_connections = (torch.mm(S, S.permute(1,0)) - A).flatten()
+    return torch.norm(coarse_connections,dim = -1)
 
 def evaluate_pose(x, att):
     # x: BN3, att: BKN
@@ -500,7 +530,7 @@ def assignment_entropy(s_matrix):
             entropy = -p_log_p.mean()
             #print(entropy)
             output_entropy += entropy
-    output_entropy *= 0
+
     return output_entropy
     
 
@@ -533,10 +563,12 @@ def grid(width, height, device = "cuda:0" if torch.cuda.is_available() else "cpu
     grid_x, grid_y = torch.meshgrid(x, y, indexing='ij')
     return torch.cat([grid_x.unsqueeze(0),grid_y.unsqueeze(0)], dim = 0).permute(1,2,0)
 
-config.perception_size = 3
-config.hierarchy_construct = [7,5,3]
-config.conv_feature_dim = 128
+#config.hierarchy_construct = [7,5,3]
+#config.conv_feature_dim = 128
+config.perception = "valkyr"
+model = SceneLearner(config)
 model.scene_perception = ValkyrNet(config)
+model = torch.load("checkpoints/temp.ckpt",map_location="cpu")
 
 perception_outputs = model.scene_perception(sample["image"])
 scene_tree = perception_outputs["scene_tree"]
@@ -550,16 +582,12 @@ def calculate_masks(scores, connections):
         all_masks.append(curr_mask)
     return all_masks
 
-vis_score = scene_tree["object_scores"]
-#vis_score[-1][0][1] = 0.5
-print(vis_score[-1][0].cpu().detach().numpy())
-print(vis_score[-2][0].cpu().detach().numpy())
-print(vis_score[-3][0].cpu().detach().numpy())
-all_masks = calculate_masks(vis_score,scene_tree["connections"])
+
 
 def display_batch(sample,outputs,batch = 0,file_name = "temp.png"):
     
     B, W, H, C = sample["image"].shape
+
     count = 0
     for i, masks in enumerate(reversed(outputs["masks"])):
         B, N, K = masks.shape
@@ -578,7 +606,7 @@ def display_batch(sample,outputs,batch = 0,file_name = "temp.png"):
             for j in range(K):
                 plt.plot((W*poses[i,0],W*poses[j,0]),\
                          (H*poses[i,1],H*poses[j,1]),color = "red",\
-                             alpha = float(layer_connection[i][j].clamp(0.0,1.0))
+                             alpha = 1.0 #float(layer_connection[i][j].clamp(0.0,1.0))
                     )
         plt.scatter(poses[:,0] * W, poses[:,1] * H, c = "cyan")
 
@@ -588,7 +616,6 @@ def display_batch(sample,outputs,batch = 0,file_name = "temp.png"):
             plt.imshow(masks.detach()[batch][:,j].reshape(W,H).permute(1,0), cmap="bone")
             plt.scatter(poses[j,0] * W, poses[j,1] * H, c = "cyan")
         plt.savefig("outputs/display_{}.png".format(count))
-   
 
 display_batch(sample,perception_outputs)
 plt.show()
