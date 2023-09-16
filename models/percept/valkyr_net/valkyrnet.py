@@ -283,7 +283,7 @@ class ObjectRender(nn.Module):
             grid = grid.unsqueeze(1).repeat(1,N,1,1)
             expand_latent = latent.unsqueeze(2).repeat(1,1,WH,1)
         cat_feature = torch.cat([grid, expand_latent], dim = -1)
-        return (self.render_block(cat_feature) * 0.7 + 0.5).clamp(0.0, 1.0)
+        return torch.sigmoid(self.render_block(cat_feature) * 3 )
 
 
 class ValkyrNet(nn.Module):
