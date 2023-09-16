@@ -454,7 +454,7 @@ class ValkyrNet(nn.Module):
 
         # [Add all the loss terms]
         #outputs["masks"] = layer_masks
-        outputs["losses"] = {"entropy":entropy_regular*0,
+        outputs["losses"] = {"entropy":entropy_regular*1.0,
         "reconstruction":reconstruction_loss,"equi":equi_loss*0,"localization":loc_loss*0}
         return outputs
 
