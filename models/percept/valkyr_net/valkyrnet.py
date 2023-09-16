@@ -208,7 +208,7 @@ class GNNSoftPooling(nn.Module):
             output_node_features = []
             output_new_adj = []
             output_s_matrix = []
-            scale = 1.0
+            scale = 3.2
             for i in range(len(adj)):
                 s_matrix = self.assignment_net(x[i:i+1], adj[i]) #[B,N,M]
                 s_matrix = torch.softmax(s_matrix * scale , dim = 2)#.clamp(0.0+eps,1.0-eps)
@@ -457,6 +457,7 @@ class ValkyrNet(nn.Module):
         outputs["losses"] = {"entropy":entropy_regular*1.0,
         "reconstruction":reconstruction_loss,"equi":equi_loss*0,"localization":loc_loss*0}
         return outputs
+
 
 def frobenius_norm(A, S):
     # A: [N,N] S:[N,M]
