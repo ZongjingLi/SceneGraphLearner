@@ -208,7 +208,7 @@ class GNNSoftPooling(nn.Module):
             output_node_features = []
             output_new_adj = []
             output_s_matrix = []
-            scale = 12.2
+            scale = 1.0
             for i in range(len(adj)):
                 s_matrix = self.assignment_net(x[i:i+1], adj[i]) #[B,N,M]
                 s_matrix = torch.softmax(s_matrix * scale , dim = 2)#.clamp(0.0+eps,1.0-eps)

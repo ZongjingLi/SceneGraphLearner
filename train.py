@@ -241,6 +241,7 @@ def train_scenelearner(train_model, config, args):
                     visualize_tree(vis_scores, vis_connections, scale = 1.618, file_name = "outputs/scene_tree{}.png".format(b))
 
                     for i,recon in enumerate(perception_outputs["reconstructions"]):
+
                         #print(perception_outputs["masks"][i+1][b,...].shape,recon[b,...].shape)
                         n,w,h,_ = recon[b,...].shape
                         #curr_recon = (perception_outputs["masks"][i][b,...].reshape(w,h,n,1).permute(2,0,1,3)*
@@ -249,8 +250,11 @@ def train_scenelearner(train_model, config, args):
                         plt.imshow(recon[b,...].sum(0).detach())
                         plt.savefig("temp.png")
                         save_name = "batch{}_recon_layer{}.png".format(b, i + 1)
-
                         visualize_image_grid(curr_recon.permute(0,3,1,2), curr_recon.shape[0], save_name)
+                        vis_masks = perception_outputs["masks"][i][b,...].reshape(w,h,n).permute(2,0,1)
+                        for i in range(vis_masks.shape[0]):print(vis_masks[i,:,:].max(), vis_masks[i].min())
+                        vis_masks = vis_masks.unsqueeze(1)
+                        visualize_image_grid(vis_masks, vis_masks.shape[0], "masks")
                         writer.add_images("batch{}_layer{}".format(b, i + 1),curr_recon.permute(0,3,1,2),itrs)
                        
                     scene_tree_ims.append(torch.tensor(plt.imread("outputs/scene_tree{}.png".format(b))).unsqueeze(0))
