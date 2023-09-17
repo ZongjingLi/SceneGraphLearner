@@ -5,6 +5,7 @@ from .slot_attention import *
 from .utils import *
 from .convs import *
 from models.nn.primary import *
+import math
 
 class RDB_Conv(nn.Module):
     def __init__(self, inChannels, growRate, kSize=3):
@@ -113,7 +114,7 @@ class RDN(nn.Module):
 
 class GraphConvolution(nn.Module):
 
-    def __init__(self, input_feature_num, output_feature_num, itrs = 5, add_bias=True, dtype=torch.float,
+    def __init__(self, input_feature_num,output_mask_dim, output_feature_num, itrs = 5, add_bias=True, dtype=torch.float,
                  batch_normal=True):
         super().__init__()
         # shapes
@@ -128,7 +129,8 @@ class GraphConvolution(nn.Module):
         self.prim_net = nn.Identity() #FCBlock(128,2,input_feature_num, latent_dim)
         self.prop = nn.Linear(latent_dim, latent_dim)
         self.bias = nn.Parameter(torch.randn(latent_dim,dtype=dtype))
-        self.transform = FCBlock(128,2,latent_dim, self.output_feature_num)
+        self.transform = nn.Linear(latent_dim, output_feature_num)
+        self.mask_pred = FCBlock(128,3,latent_dim, output_mask_dim)
         
         self.sparse = True
         self.itrs = itrs
@@ -151,56 +153,45 @@ class GraphConvolution(nn.Module):
         #x = torch.nn.functional.normalize(x,p = 1.0, dim = -1, eps = 1e-5)
         for i in range(self.itrs):
             if self.sparse or isinstance(adj, torch.SparseTensor):
-                x = x + torch.spmm(adj,x[0]).unsqueeze(0)
+                x = self.adj_split(x[0], adj, sparse = True)
             else:
                 #x = x + torch.matmul(adj,x[0])
-                x = x + self.adj_split(x[0], adj)
+                #print("running adj")
+                x = self.adj_split(x[0], adj)
             x = F.normalize(x,p = 2)
+            
 
+        masks = self.mask_pred(x)
         x = self.transform(x)
 
-        return x
+        return masks, x
     
     @staticmethod
-    def adj_split(x, adj):
+    def adj_split(x, adj, sparse = False):
         # x: [N,D] adj:[N,N]
-        if True:
-            weights = torch.tanh(torch.einsum("nd,nd->nn"))
-            weights = weights * adj
-            x = x + torch.mm(weights,x)
+        if sparse:
+            #weights = torch.tanh(torch.matmul(x,x.permute(1,0)) * math.sqrt(x.shape[0]) )
+            #print("sparse_split:",weights.max(),weights.min() )
+            #weights = weights * adj
+            #print(weights.shape, weights.max(), weights.min())
+            x = x + torch.spmm(adj,x).unsqueeze(0)
+                #print("running incenerate")
+        else:
+            #weights = torch.tanh(torch.einsum("nd,md->nn",x,x))
+            #print("contig_split:",weights.max(),weights.min())
+            #weights = weights * adj
+            x = x + torch.mm(adj,x)
         return x
     
-class GraphConvolution_(nn.Module):
-    def __init__(self, input_dim, output_dim, itrs = 3):
-        super().__init__()
-        hidden_dim = 128
-        self.prim_encoder = nn.Linear(input_dim, hidden_dim)
-
-        self.edge_propagators = nn.Linear(hidden_dim, hidden_dim)
-
-        self.classifier = nn.Linear(hidden_dim, output_dim)
-        self.itrs = itrs
-
-    def forward(self, x, adj):
-        # x:[B,N,D] adj:[B,N,N]
-        prop_features = self.prim_encoder(x)
-
-        for i in range(self.itrs):
-            if len(adj.shape) == 3:
-                prop_features = torch.bmm(adj, prop_features)
-                prop_features = self.edge_propagators(prop_features)
-            else: 
-                prop_features = torch.mm(adj, prop_features.squeeze(0)).unsqueeze(0)
-                prop_features = self.edge_propagators(prop_features)
-            
-        outputs = self.classifier(prop_features)
-        return outputs
 
 class GNNSoftPooling(nn.Module):
     def __init__(self, input_feat_dim, output_node_num = 5, itrs = 1):
         super().__init__()
-        self.assignment_net = GraphConvolution(input_feat_dim, output_node_num, itrs)
-        self.feature_net =   GraphConvolution(input_feat_dim, input_feat_dim, itrs) 
+        #self.assignment_net = GraphConvolution(input_feat_dim, output_node_num, itrs)
+        #self.feature_net =   GraphConvolution(input_feat_dim, input_feat_dim, itrs) 
+
+        self.joint_net = GraphConvolution(input_feat_dim, output_node_num,input_feat_dim,itrs = itrs)
+        
 
     def forward(self, x, adj):
         B,N,D = x.shape
@@ -210,11 +201,16 @@ class GNNSoftPooling(nn.Module):
             output_s_matrix = []
             scale = 3.2
             for i in range(len(adj)):
-                s_matrix = self.assignment_net(x[i:i+1], adj[i]) #[B,N,M]
-                s_matrix = torch.softmax(s_matrix * scale , dim = 2)#.clamp(0.0+eps,1.0-eps)
+                if 0:
+                    s_matrix = self.assignment_net(x[i:i+1], adj[i]) #[B,N,M]
+                    s_matrix = torch.softmax(s_matrix * scale , dim = 2)#.clamp(0.0+eps,1.0-eps)
             
-                node_features = self.feature_net(x[i:i+1],adj[i]) #[B,N,D]
-                node_features = torch.einsum("bnm,bnd->bmd",s_matrix,node_features) #[B,M,D]
+                    node_features = self.feature_net(x[i:i+1],adj[i]) #[B,N,D]
+                else:
+                    s_matrix, node_features = self.joint_net(x[i:i+1], adj[i])
+                    s_matrix = torch.softmax(s_matrix * scale, dim = 2)
+                node_features = torch.bmm(s_matrix.permute(0,2,1),node_features)
+                #node_features = torch.einsum("bnm,bnd->bmd",s_matrix,node_features) #[B,M,D]
                 # [Calculate New Cluster Adjacency]
 
                 adj[i] = adj[i]
@@ -258,32 +254,80 @@ def get_fourier_feature(grid, term = 7):
     output_feature = torch.cat(output_feature, dim = -1)
     return output_feature
 
+def RenderQTR(G,features):
+
+    # Render 20 dim Features using 2 centroids and attribute
+    centers   = features[:,:2] # Size:[N,2]
+    paras     = features[:,2:] # Size:[N,18]
+    output_channels = []
+    mx,my = G
+
+    for c in range(3):
+
+        ch,cw = centers[:,0:1],centers[:,1:2]
+        bp = paras[:,c * 6: (c + 1) * 6]
+
+        a,ah,aw,ahh,aww,ahw = bp[:,0:1],bp[:,1:2],bp[:,2:3],bp[:,3:4],bp[:,4:5],bp[:,5:6]
+
+        qtr_var = a + \
+        ah*(mx - ch) + aw*(my - cw) +\
+        ahh*(mx - ch)**2 + aww*(my - cw)**2 + \
+            ahw * (mx - ch) * (my - cw)
+     
+        output_channels.append(qtr_var.unsqueeze(-1))
+
+
+    return torch.cat(output_channels,-1)
+
 class ObjectRender(nn.Module):
     def __init__(self,config, conv_feature_dim):
         super().__init__()
         channel_dim = config.channel
         spatial_dim = config.spatial_dim
         fourier_dim = config.fourier_dim
+        self.config = config
 
         self.conv_feature_dim = conv_feature_dim
-        self.render_block  = FCBlock(128,3,conv_feature_dim + spatial_dim + spatial_dim + 2*spatial_dim*fourier_dim,channel_dim)
+        self.flag = True
+        if self.flag:
+            self.render_block  = nn.Linear(conv_feature_dim + spatial_dim + spatial_dim + 2*spatial_dim*fourier_dim,channel_dim)
+            #self.render_block  = FCBlock(32,3,conv_feature_dim + spatial_dim + spatial_dim + 2*spatial_dim*fourier_dim,channel_dim)
+        else:
+            self.render_block  = FCBlock(128,1,conv_feature_dim + 2,20)
 
     def forward(self, latent, grid):
         B,N,D = latent.shape
-        if len(grid.shape) == 4:
-            # grid: [B,W,H,2]
-            B, W, H, _ = grid.shape
-            expand_latent = latent.unsqueeze(2).unsqueeze(2)
-            expand_latent = expand_latent.repeat(1,1,W,H,1)
-            grid = grid.unsqueeze(1)
-            grid = grid.repeat(1,N,1,1,1)
-        if len(grid.shape) == 3:
-            # grid: [B,WH,2]
-            B, WH, _ = grid.shape
-            grid = grid.unsqueeze(1).repeat(1,N,1,1)
-            expand_latent = latent.unsqueeze(2).repeat(1,1,WH,1)
-        cat_feature = torch.cat([grid, expand_latent], dim = -1)
-        return torch.sigmoid(self.render_block(cat_feature) * 3 )
+        W,H = self.config.resolution
+
+        if self.flag:
+            if len(grid.shape) == 4:
+                # grid: [B,W,H,2]
+                B, W, H, _ = grid.shape
+                expand_latent = latent.unsqueeze(2).unsqueeze(2)
+                expand_latent = expand_latent.repeat(1,1,W,H,1)
+                grid = grid.unsqueeze(1)
+                grid = grid.repeat(1,N,1,1,1)
+            if len(grid.shape) == 3:
+                # grid: [B,WH,2]
+                B, WH, _ = grid.shape
+                grid = grid.unsqueeze(1).repeat(1,N,1,1) * 32
+                expand_latent = latent.unsqueeze(2).repeat(1,1,WH,1)
+            cat_feature = torch.cat([grid, expand_latent], dim = -1)
+            return torch.sigmoid(self.render_block(cat_feature) * 3.2 ), 0
+        else:
+            mx = torch.linspace(-1,1,128)
+            my = torch.linspace(-1,1,128)
+            mx,my = torch.meshgrid([mx,my])
+            mx = mx.reshape(-1).unsqueeze(0).repeat(B,1)
+            my = my.reshape(-1).unsqueeze(0).repeat(B,1)
+
+            qtr_features = self.render_block(latent)
+
+            outputs = []
+            for i in range(N):
+                outputs.append(RenderQTR([mx,my],qtr_features[:,i,:]).unsqueeze(1))
+            outputs = torch.sigmoid(torch.cat(outputs, dim = 1).reshape(B,N,W,H,3))
+            return outputs, 0
 
 
 class ValkyrNet(nn.Module):
@@ -392,7 +436,7 @@ class ValkyrNet(nn.Module):
             syn_grid = torch.cat([self.spatial_coords.to(device)\
                                   ,self.spatial_fourier_features.to(device)], dim = -1).unsqueeze(0).repeat(B,1,1,1)
 
-            layer_recons = self.render_fields[i](
+            layer_recons,loss = self.render_fields[i](
                 curr_x,
                 syn_grid
                 )
@@ -440,13 +484,14 @@ class ValkyrNet(nn.Module):
                 .unsqueeze(-1).unsqueeze(-1).unsqueeze(-1).repeat(1,1,W,H,C) 
 
             mask = layer_masks[i+1].permute(0,2,1).reshape(B,N,W,H,1)
-
-            recons = recons * mask * exist_prob
+            
+            recons = recons * mask# * exist_prob
+            outputs["reconstructions"].append(recons)
             
             #layer_recon_loss = torch.nn.functional.mse_loss(recons, x.unsqueeze(1).repeat(1,N,1,1,1))
             layer_recon_loss = torch.nn.functional.mse_loss(recons.sum(dim = 1), x)
             reconstruction_loss += layer_recon_loss
-            outputs["reconstructions"].append(recons)
+            
 
 
         # [Output the Scene Tree]
@@ -454,8 +499,8 @@ class ValkyrNet(nn.Module):
 
         # [Add all the loss terms]
         #outputs["masks"] = layer_masks
-        outputs["losses"] = {"entropy":entropy_regular*1.0,
-        "reconstruction":reconstruction_loss,"equi":equi_loss*0,"localization":loc_loss*0}
+        outputs["losses"] = {"entropy":entropy_regular*.000001,
+        "reconstruction":reconstruction_loss,"equi":equi_loss*0,"localization":loc_loss*1.}
         return outputs
 
 

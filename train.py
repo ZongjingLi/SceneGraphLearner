@@ -101,6 +101,10 @@ def train_scenelearner(train_model, config, args):
     
 
     # [Create the Dataloader]
+    if args.dataset == "Hearth":
+        train_dataset = HearthDataset("train", resolution = config.resolution)
+    if args.dataset == "Battlecode":
+        train_dataset = BattlecodeImageData("train", resolution = config.resolution)
     if args.dataset == "PTR":
         train_dataset = PTRData("train", resolution = config.resolution)
         val_dataset =  PTRData("val", resolution = config.resolution)
@@ -252,7 +256,7 @@ def train_scenelearner(train_model, config, args):
                         save_name = "batch{}_recon_layer{}.png".format(b, i + 1)
                         visualize_image_grid(curr_recon.permute(0,3,1,2), curr_recon.shape[0], save_name)
                         vis_masks = perception_outputs["masks"][i][b,...].reshape(w,h,n).permute(2,0,1)
-                        for i in range(vis_masks.shape[0]):print(vis_masks[i,:,:].max(), vis_masks[i].min())
+                        #for i in range(vis_masks.shape[0]):print(vis_masks[i,:,:].max(), vis_masks[i].min())
                         vis_masks = vis_masks.unsqueeze(1)
                         visualize_image_grid(vis_masks, vis_masks.shape[0], "masks")
                         writer.add_images("batch{}_layer{}".format(b, i + 1),curr_recon.permute(0,3,1,2),itrs)

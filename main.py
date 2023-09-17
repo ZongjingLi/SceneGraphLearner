@@ -128,7 +128,7 @@ if args.mode == "scenelearner":
         print("start the 3d point cloud model training.")
         train_pointcloud(model.scenelearner, config, args, phase = args.phase)
 
-    if args.dataset in ["Sprites","Acherus","Toys","PTR"]:
+    if args.dataset in ["Sprites","Acherus","Toys","PTR","Hearth","Battlecode"]:
         print("start the image domain training session.")
 
         if args.name in ["VKY"]:
