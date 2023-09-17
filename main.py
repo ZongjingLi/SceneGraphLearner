@@ -61,6 +61,7 @@ argparser.add_argument("--dataset",                 default = "toy")
 argparser.add_argument("--category",                default = ["vase"])
 argparser.add_argument("--freeze_perception",       default = False)
 argparser.add_argument("--concept_type",            default = False)
+argparser.add_argument("--domain",                  default = "sprites")
 
 # [perception and language grounding training]
 argparser.add_argument("--perception",              default = "psgnet")
@@ -91,6 +92,8 @@ argparser.add_argument("--env_name",                default = "None")
 argparser.add_argument("--traj_sample_num",         default = 2)
 
 args = argparser.parse_args()
+
+config.domain = args.domain
 
 config.perception = args.perception
 if args.concept_type: config.concept_type = args.concept_type
