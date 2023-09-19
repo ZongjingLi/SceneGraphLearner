@@ -91,6 +91,7 @@ def collect_qa_batch(batch_qa):
 
 
 def train_scenelearner(train_model, config, args):
+    root = config.root
     IGNORE_KEY = True
     train_model = train_model.to(config.device)
     query = True if args.training_mode in ["joint","query"] else False
@@ -190,7 +191,7 @@ def train_scenelearner(train_model, config, args):
                         qa_summary += "\n" + question + "\n"
                         qa_summary += programs[i] + "\n"
 
-                        if answer in ["True","False"]:answer = {"True":"yes,","False":"no"}[answer]
+                        if answer in ["True","False"]:answer = {"True":"yes","False":"no"}[answer]
                         if answer in ["1","2","3","4","5","6","7","8","9"]:answer = num2word(int(answer))
 
                         if answer in numbers:
@@ -209,9 +210,9 @@ def train_scenelearner(train_model, config, args):
                             else:predict_answer = "no"
     
                             if itrs % args.checkpoint_itrs == 0:
-                                save_name = "b{}_q{}_answer_distribution".format(b,q)
+                                save_name = root+"b{}_q{}_answer_distribution".format(b,q)
                                 answer_distribution_binary(o["end"].sigmoid().cpu().detach(),save_name)
-    
+                        print(answer)
                         if predict_answer == answer:
                             batch_correct_qa += 1
                         batch_total_qa += 1
@@ -236,7 +237,7 @@ def train_scenelearner(train_model, config, args):
 
             if not(itrs % args.checkpoint_itrs): # [Visualzie Outputs] always visualize all the batch
                 scene_tree = perception_outputs["scene_tree"]
-                torch.save(train_model,"checkpoints/temp.ckpt")
+                torch.save(train_model,root + "/checkpoints/temp.ckpt")
 
                 scene_tree_ims = []
                 for b in range(min(2, actual_batch_size)):

@@ -5,7 +5,7 @@ from models import *
 translator = {"scene":Scene,"exist":Exist,"filter":Filter,"union":Union,"unique":Unique,"count":Count,
               "parents":Parents,"subtree":Subtree}
 
-LOCAL = True
+LOCAL = False
 
 root_path = "/Users/melkor/Documents/GitHub/SceneGraphLearner" if LOCAL else "SceneGraphLearner"
 
