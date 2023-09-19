@@ -565,12 +565,14 @@ def grid(width, height, device = "cuda:0" if torch.cuda.is_available() else "cpu
 
 #config.hierarchy_construct = [7,5,3]
 #config.conv_feature_dim = 128
+from models import *
 config.perception = "valkyr"
 model = SceneLearner(config)
 model.scene_perception = ValkyrNet(config)
-model = torch.load("checkpoints/test_temp.ckpt",map_location="cpu")
+model = torch.load("checkpoints/sprites_temp.ckpt",map_location="cpu")
 
-perception_outputs = model.scene_perception(sample["image"])
+with torch.no_grad():
+    perception_outputs = model.scene_perception(sample["image"], test = True)
 scene_tree = perception_outputs["scene_tree"]
 
 def calculate_masks(scores, connections):

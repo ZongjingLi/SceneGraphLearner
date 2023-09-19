@@ -1,14 +1,14 @@
+from re import L
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
 
 a_norm_eps = "eps"
-
 class KoutLayer(nn.Module):
     def __init__(self, inc, num_g, shift=False, outc=None, bn_type="gn"):
         super(KoutLayer, self).__init__()
-        #print("num K: {}".format(num_g))
+        print("num K: {}".format(num_g))
 
         self.conv_att = nn.Conv2d(inc, num_g, 1)        
 
@@ -24,12 +24,11 @@ class KoutLayer(nn.Module):
                 self.norm = nn.Identity()
         else:
             self.linear = None
-        self.scale = nn.Parameter(torch.ones(1))
 
     def forward(self, x, context_vec=None, return_att=False):
         
         attention = self.conv_att(x)
-        a = torch.softmax(attention * 1.0, dim=1) # BKN1
+        a = torch.softmax(attention, dim=1) # BKN1
         # ACN
         a = a[:, None]# B1GN1
 
@@ -57,7 +56,7 @@ class KoutLayer(nn.Module):
 class ACN2dMultiBranch(nn.Module):
     def __init__(self, inc, num_g=1, atten_opt="softmax", rescale=None, eps=1e-3, reg=False, bin_score=None):
         super(ACN2dMultiBranch, self).__init__()
-        #print("num_head: {}".format(num_g))
+        print("num_head: {}".format(num_g))
         self.atten_opt = atten_opt
         self.num_g = num_g
         self.eps = eps
@@ -140,9 +139,15 @@ class ACN2dMultiBranch(nn.Module):
             out = out * weight_bias + bias_bias
         return out
 
+    
+class Sine(nn.Module):
+    def __init__(self):
+        super().__init__()
+    def forward(self, x):return torch.sin(x)
+
 
 class ConvLayer(nn.Module):
-    def __init__(self, inc, outc, cn_type="acn_b", cn_pos="post", bn="gn", reg=False, act="relu", bin_score=None):
+    def __init__(self, inc, outc, cn_type="acn_g", cn_pos="post", bn="gn", reg=False, act="relu", bin_score=None):
         super(ConvLayer, self).__init__()
         self.layer = nn.Sequential()
 
@@ -152,7 +157,7 @@ class ConvLayer(nn.Module):
                 "conv", nn.Conv2d(inc, outc, 1, 1))
             inc = outc
         
-        #print("cn_type: {}".format(cn_type))
+        print("cn_type: {}".format(cn_type))
 
         if cn_type.startswith("acn_b"):
             num_g = int(cn_type.split("-")[-1])
@@ -187,7 +192,7 @@ class ConvLayer(nn.Module):
             pass
         else:
             raise NotImplementedError
-        #print("bn type: {}".format(bn))
+        print("bn type: {}".format(bn))
         if act == "relu":
             self.layer.add_module(
                 "relu", nn.ReLU(inplace=True))
@@ -197,10 +202,6 @@ class ConvLayer(nn.Module):
     def forward(self, x):
         return self.layer(x)
 
-class Sine(nn.Module):
-    def __init__(self):super().__init__()
-
-    def forward(self,x): return torch.sin(x)
 
 class ResBlock(nn.Module):
 

@@ -6,6 +6,8 @@ from .utils import *
 from .convs import *
 from models.nn.primary import *
 import math
+import time
+import datetime
 
 class RDB_Conv(nn.Module):
     def __init__(self, inChannels, growRate, kSize=3):
@@ -364,13 +366,16 @@ class ValkyrNet(nn.Module):
         self.conv2object_feature = nn.Linear(conv_feature_dim + 2, config.object_dim)
         self.device = "cuda:0" if torch.cuda.is_available() else "cpu"
     
-    def forward(self, x, verbose = 0):
+    def forward(self, x, verbose = 0, test = False):
         outputs = {}
         B,W,H,C = x.shape # input shape
         device = self.device
+        timing = True
 
         # [Grid Convolution] produce initial feature in the grid domain 
+        if timing:start = time.time()
         grid_conv_feature = self.grid_convs(x.permute(0,3,1,2)).to(device).permute(0,2,3,1) 
+        if timing:print("Convs:",datetime.timedelta(seconds = time.time() - start))
 
         _,_,_,D = grid_conv_feature.shape
         coords_added_conv_feature = torch.cat(
@@ -404,7 +409,10 @@ class ValkyrNet(nn.Module):
         layer_reconstructions = []
         layer_masks = [torch.ones(B,curr_x.shape[1]).to(self.device)]  # maintain a mask
         for i,graph_pool in enumerate(self.diff_pool):
+            if timing:start = time.time()
             curr_x, curr_edges, assignment_matrix = graph_pool(curr_x, curr_edges)
+            if timing:print("GraphConvs:",datetime.timedelta(seconds = time.time() - start))
+            
             B,N,M = assignment_matrix.shape
             assignment_matrix = scene_tree["object_scores"][-1].unsqueeze(2).repeat(1,1,M) * assignment_matrix
 
@@ -421,8 +429,9 @@ class ValkyrNet(nn.Module):
             exist_prob = torch.ones(B, assignment_matrix.shape[-1]).to(device)
 
             # [Equivariance Loss]
-            equis =assignment_matrix.unsqueeze(1).unsqueeze(-1)
-            equi_loss += equillibrium_loss(equis) 
+            if not test:
+                equis =assignment_matrix.unsqueeze(1).unsqueeze(-1)
+                equi_loss += equillibrium_loss(equis) 
             
             # [Frobenius Term]
 
@@ -436,10 +445,12 @@ class ValkyrNet(nn.Module):
             syn_grid = torch.cat([self.spatial_coords.to(device)\
                                   ,self.spatial_fourier_features.to(device)], dim = -1).unsqueeze(0).repeat(B,1,1,1)
 
+            if timing:start = time.time()
             layer_recons,loss = self.render_fields[i](
                 curr_x,
                 syn_grid
                 )
+           
 
             if verbose: print("reconstruction with shape: ", layer_recons.shape)
             layer_reconstructions.append(layer_recons)
@@ -448,21 +459,24 @@ class ValkyrNet(nn.Module):
             
             # [Regular Entropy Term]
             
-            layer_mask
             outputs["masks"].append(layer_mask)
             
-            points = self.spatial_coords.unsqueeze(0).repeat(B,1,1,1).reshape(B,W*H,2)
+            if not test:
+                points = self.spatial_coords.unsqueeze(0).repeat(B,1,1,1).reshape(B,W*H,2)
+                variance = spatial_variance(points, layer_mask.permute(0,2,1), norm_type="l2")
+                loc_loss += 1.0 * variance.mean()
 
-            variance = spatial_variance(points, layer_mask.permute(0,2,1), norm_type="l2")
-            loc_loss += 1.0 * variance.mean()
-
-            # [Poses]
-            # [B,N,K] [B,N,2]
-            poses = torch.matmul(layer_mask.permute(0,2,1),points)/layer_mask.sum(1).unsqueeze(-1)
+                # [Poses]
+                # [B,N,K] [B,N,2]
+                poses = torch.matmul(layer_mask.permute(0,2,1),points)/layer_mask.sum(1).unsqueeze(-1)
    
-            outputs["poses"].append({"centers":poses,"vars":variance})
+                outputs["poses"].append({"centers":poses,"vars":variance})
 
-            entropy_regular += assignment_entropy(assignment_matrix)
+                entropy_regular += assignment_entropy(assignment_matrix)
+            else:
+                points = self.spatial_coords.unsqueeze(0).repeat(B,1,1,1).reshape(B,W*H,2)
+                poses = torch.matmul(layer_mask.permute(0,2,1),points)/layer_mask.sum(1).unsqueeze(-1)
+                outputs["poses"].append({"centers":poses,"vars":1.})
 
             # load results to the scene tree
             scene_tree["x"].append(curr_x)
@@ -470,6 +484,7 @@ class ValkyrNet(nn.Module):
             scene_tree["object_scores"].append(exist_prob)
             scene_tree["connections"].append(assignment_matrix)
             scene_tree["edges"].append(curr_edges)
+            if timing:print("Render:",datetime.timedelta(seconds = time.time() - start))
 
         # [Calculate Reconstruction at Each Layer]
         outputs["reconstructions"] = []
@@ -479,6 +494,7 @@ class ValkyrNet(nn.Module):
         for i,recons in enumerate(layer_reconstructions):
 
             B,N,W,H,C = recons.shape
+            if timing:start = time.time()
 
             exist_prob = scene_tree["object_scores"][i+1]\
                 .unsqueeze(-1).unsqueeze(-1).unsqueeze(-1).repeat(1,1,W,H,C) 
@@ -491,8 +507,9 @@ class ValkyrNet(nn.Module):
             #layer_recon_loss = torch.nn.functional.mse_loss(recons, x.unsqueeze(1).repeat(1,N,1,1,1))
             layer_recon_loss = torch.nn.functional.mse_loss(recons.sum(dim = 1), x)
             reconstruction_loss += layer_recon_loss
-            
 
+            if timing:print("Recons:",datetime.timedelta(seconds = time.time() - start))
+            
 
         # [Output the Scene Tree]
         outputs["scene_tree"] = scene_tree
