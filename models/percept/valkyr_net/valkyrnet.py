@@ -341,7 +341,7 @@ class ValkyrNet(nn.Module):
         self.imsize = config.imsize
         self.perception_size = config.perception_size
         # build the connection graph for the grid domain
-        self.spatial_coords = grid(self.imsize,self.imsize,device=device)
+        self.spatial_coords = grid(self.imsize,self.imsize,device=device).to(device)
         self.spatial_fourier_features = get_fourier_feature(self.spatial_coords, term = config.fourier_dim).to(device)
         self.spatial_edges =  build_perception(self.imsize,self.perception_size,device = device).to_dense().to(device)
         # [Grid Convs]
@@ -365,6 +365,12 @@ class ValkyrNet(nn.Module):
 
         self.conv2object_feature = nn.Linear(conv_feature_dim + 2, config.object_dim)
         self.device = "cuda:0" if torch.cuda.is_available() else "cpu"
+
+    def prepare_save(self):
+        self.spatial_fourier_features = None
+
+    def prepare_load(self):
+        self.spatial_fourier_features = get_fourier_feature(self.spatial_coords, term = self.config.fourier_dim).to(self.device)
     
     def forward(self, x, verbose = 0, test = False):
         outputs = {}
