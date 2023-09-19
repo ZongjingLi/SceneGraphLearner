@@ -568,7 +568,7 @@ def grid(width, height, device = "cuda:0" if torch.cuda.is_available() else "cpu
 config.perception = "valkyr"
 model = SceneLearner(config)
 model.scene_perception = ValkyrNet(config)
-model = torch.load("checkpoints/sprites_temp.ckpt",map_location="cpu")
+model = torch.load("checkpoints/test_temp.ckpt",map_location="cpu")
 
 perception_outputs = model.scene_perception(sample["image"])
 scene_tree = perception_outputs["scene_tree"]
