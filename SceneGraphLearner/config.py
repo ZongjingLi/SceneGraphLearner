@@ -27,7 +27,7 @@ parser.add_argument("--category",               default = "")
 # setup the perception module
 parser.add_argument("--perception",             default = "valkyr")
 parser.add_argument("--channel",                default = 3)
-parser.add_argument("--spatial_dim",            default = 2)
+
 parser.add_argument("--fourier_dim",            default = 10)
 parser.add_argument("--perception_size",        default = 1)
 parser.add_argument("--imsize",                 default = 128)
