@@ -3,7 +3,7 @@ import pymunk
 import timeit
 import math
 
-SCREEN_WIDTH = 1200
+SCREEN_WIDTH = 800
 SCREEN_HEIGHT = 800
 SCREEN_TITLE = "Shadows of Angrathar"
 
